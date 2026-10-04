@@ -230,7 +230,7 @@ func _draw_hero_panel() -> void:
 			var status := "МЁРТВ" if not hero.alive() else "БЕЗ СОЗНАНИЯ"
 			_text(status, Vector2(27, top + 78), 16, Color("f48a85"))
 		elif hero.cooldown > 0.0:
-			_text("Отдых %.1f c" % hero.cooldown, Vector2(237, top + 194), 12, Color("dfbd78"))
+			_text("Отдых %.1f c" % hero.cooldown, Vector2(228, top + 194), 12, Color("dfbd78"))
 
 
 func _draw_portrait(hero, rect: Rect2) -> void:
@@ -260,7 +260,7 @@ func _draw_resource_bar(rect: Rect2, value: int, maximum: int, fill_color: Color
 func _slot_rect(top: float, slot: int) -> Rect2:
 	var column := slot % 2
 	var row := floori(float(slot) / 2.0)
-	return Rect2(230 + column * 53, top + 12 + row * 49, 48, 44)
+	return Rect2(212 + column * 59, top + 12 + row * 49, 54, 44)
 
 
 func _slot_action_id(hero, slot: int) -> String:
@@ -301,7 +301,7 @@ func _draw_action_slot(hero, top: float, slot: int) -> void:
 	draw_rect(rect, Color(0.09, 0.13, 0.17, 0.93) if available else Color(0.08, 0.08, 0.09, 0.86), true)
 	draw_rect(rect, edge, false, 2.0)
 	draw_rect(Rect2(rect.position + Vector2(3, 3), rect.size - Vector2(6, 6)), Color("4c5b63") if available else Color("36383a"), false, 1.0)
-	var center: Vector2 = rect.position + Vector2(22, 22)
+	var center: Vector2 = rect.position + Vector2(24, 22)
 	match slot:
 		0: _draw_swords_icon(center, available)
 		1: _draw_bow_icon(center, available)
@@ -315,13 +315,15 @@ func _draw_action_slot(hero, top: float, slot: int) -> void:
 		3: _draw_empty_icon(center)
 		4: _draw_potion_icon(center, Color("cc493e"), available)
 		5: _draw_potion_icon(center, Color("338fd0"), available)
-	draw_circle(rect.position + Vector2(39, 8), 9.0, Color("2d8dba") if available else Color("585e62"))
-	draw_arc(rect.position + Vector2(39, 8), 9.0, 0.0, TAU, 20, Color("e0c681") if available else Color("77736d"), 1.5, true)
-	_text(SLOT_KEYS[slot], rect.position + Vector2(34, 12), 11, Color.WHITE)
+	var badge_center: Vector2 = rect.position + Vector2(rect.size.x - 9, 8)
+	draw_circle(badge_center, 9.0, Color("2d8dba") if available else Color("585e62"))
+	draw_arc(badge_center, 9.0, 0.0, TAU, 20, Color("e0c681") if available else Color("77736d"), 1.5, true)
+	_text(SLOT_KEYS[slot], badge_center + Vector2(-5, 4), 11, Color.WHITE)
 	if slot == 4 or slot == 5:
 		var count: int = hero.health_potions if slot == 4 else hero.mana_potions
-		draw_circle(rect.position + Vector2(39, 36), 7.0, Color("182025"))
-		_text(str(count), rect.position + Vector2(36, 40), 11, Color.WHITE if available else Color("999999"))
+		var count_center: Vector2 = rect.position + Vector2(rect.size.x - 9, 36)
+		draw_circle(count_center, 7.0, Color("182025"))
+		_text(str(count), count_center + Vector2(-3, 4), 11, Color.WHITE if available else Color("999999"))
 
 
 func _draw_swords_icon(center: Vector2, available: bool) -> void:
