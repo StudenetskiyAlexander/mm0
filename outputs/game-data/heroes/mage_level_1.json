@@ -1,0 +1,43 @@
+{
+  "id": "mage_level_1",
+  "name": "Мира",
+  "class_id": "mage",
+  "race_id": "human",
+  "level": 1,
+  "level_up_attribute_allocations": {
+    "strength": 0,
+    "dexterity": 0,
+    "endurance": 0,
+    "intelligence": 0
+  },
+  "attributes": {
+    "strength": 3,
+    "dexterity": 3,
+    "endurance": 3,
+    "intelligence": 3
+  },
+  "skills": {},
+  "unspent_attribute_points": 0,
+  "unspent_skill_points": 0,
+  "armor": {
+    "name": "Тканевая мантия",
+    "skill_id": "cloth_armor"
+  },
+  "defense_equipment_bonus": 0,
+  "weapon": {
+    "name": "Посох",
+    "attack_type": "melee",
+    "skill_id": "staff",
+    "attack_range_hexes": 1,
+    "damage_dice": "1d4",
+    "accuracy_bonus": 0
+  },
+  "actions": [
+    "melee_attack",
+    "fire_arrow"
+  ],
+  "potions": {
+    "health": 1,
+    "mana": 1
+  }
+}

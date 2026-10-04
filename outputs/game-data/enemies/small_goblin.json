@@ -1,0 +1,31 @@
+{
+  "id": "small_goblin",
+  "name": "Маленький гоблин",
+  "race_id": "goblin",
+  "level": 1,
+  "level_up_attribute_allocations": {
+    "strength": 0,
+    "dexterity": 0,
+    "endurance": 0,
+    "intelligence": 0
+  },
+  "attributes": {
+    "strength": 1,
+    "dexterity": 1,
+    "endurance": 1,
+    "intelligence": 1
+  },
+  "skills": {},
+  "unspent_attribute_points": 0,
+  "unspent_skill_points": 0,
+  "armor": null,
+  "defense_equipment_bonus": 0,
+  "weapon": {
+    "name": "Нож",
+    "attack_type": "melee",
+    "skill_id": "knife",
+    "attack_range_hexes": 1,
+    "damage_dice": "1d6",
+    "accuracy_bonus": 0
+  }
+}

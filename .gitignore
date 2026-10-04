@@ -1,0 +1,7 @@
+work/
+.godot/
+.DS_Store
+outputs/*.png
+outputs/*.svg
+!outputs/battle-screen-vertical-party-v2.png
+outputs/*.zip

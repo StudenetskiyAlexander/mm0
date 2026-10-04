@@ -1,0 +1,45 @@
+{
+  "id": "warrior_level_3",
+  "name": "Каэл",
+  "class_id": "warrior",
+  "race_id": "human",
+  "level": 3,
+  "level_up_attribute_allocations": {
+    "strength": 2,
+    "dexterity": 1,
+    "endurance": 2,
+    "intelligence": 1
+  },
+  "attributes": {
+    "strength": 5,
+    "dexterity": 4,
+    "endurance": 5,
+    "intelligence": 4
+  },
+  "skills": {
+    "sword": 3,
+    "chain_armor": 2
+  },
+  "unspent_attribute_points": 0,
+  "unspent_skill_points": 1,
+  "armor": {
+    "name": "Кольчуга",
+    "skill_id": "chain_armor"
+  },
+  "defense_equipment_bonus": 2,
+  "weapon": {
+    "name": "Длинный меч",
+    "attack_type": "melee",
+    "skill_id": "sword",
+    "attack_range_hexes": 1,
+    "damage_dice": "1d8",
+    "accuracy_bonus": 1
+  },
+  "actions": [
+    "melee_attack"
+  ],
+  "potions": {
+    "health": 1,
+    "mana": 1
+  }
+}

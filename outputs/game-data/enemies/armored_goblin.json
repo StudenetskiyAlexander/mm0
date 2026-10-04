@@ -1,0 +1,37 @@
+{
+  "id": "armored_goblin",
+  "name": "Бронированный гоблин",
+  "race_id": "goblin",
+  "level": 2,
+  "level_up_attribute_allocations": {
+    "strength": 1,
+    "dexterity": 0,
+    "endurance": 2,
+    "intelligence": 0
+  },
+  "attributes": {
+    "strength": 2,
+    "dexterity": 1,
+    "endurance": 3,
+    "intelligence": 1
+  },
+  "skills": {
+    "axe": 1,
+    "leather_armor": 1
+  },
+  "unspent_attribute_points": 0,
+  "unspent_skill_points": 3,
+  "armor": {
+    "name": "Кожаная броня",
+    "skill_id": "leather_armor"
+  },
+  "defense_equipment_bonus": 1,
+  "weapon": {
+    "name": "Топор",
+    "attack_type": "melee",
+    "skill_id": "axe",
+    "attack_range_hexes": 1,
+    "damage_dice": "1d8",
+    "accuracy_bonus": 0
+  }
+}

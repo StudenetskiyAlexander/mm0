@@ -1,0 +1,24 @@
+{
+  "id": "skeleton_archer",
+  "name": "Скелет-лучник",
+  "attributes": {
+    "strength": 1,
+    "dexterity": 2,
+    "endurance": 1,
+    "intelligence": 0
+  },
+  "skills": {
+    "bow": 1
+  },
+  "armor": null,
+  "defense_equipment_bonus": 0,
+  "weapon": {
+    "name": "Короткий лук",
+    "attack_type": "ranged",
+    "skill_id": "bow",
+    "minimum_attack_range_hexes": 2,
+    "attack_range_hexes": 3,
+    "damage_dice": "1d6",
+    "accuracy_bonus": 0
+  }
+}

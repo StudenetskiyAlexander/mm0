@@ -1,0 +1,55 @@
+{
+  "id": "archer_level_5",
+  "name": "Лиара",
+  "class_id": "archer",
+  "race_id": "human",
+  "level": 5,
+  "level_up_attribute_allocations": {
+    "strength": 2,
+    "dexterity": 4,
+    "endurance": 4,
+    "intelligence": 2
+  },
+  "attributes": {
+    "strength": 5,
+    "dexterity": 7,
+    "endurance": 7,
+    "intelligence": 5
+  },
+  "skills": {
+    "bow": 4,
+    "leather_armor": 4
+  },
+  "unspent_attribute_points": 0,
+  "unspent_skill_points": 0,
+  "armor": {
+    "name": "Кожаная броня",
+    "skill_id": "leather_armor"
+  },
+  "defense_equipment_bonus": 1,
+  "weapon": {
+    "name": "Кинжал",
+    "attack_type": "melee",
+    "skill_id": "dagger",
+    "attack_range_hexes": 1,
+    "damage_dice": "1d4",
+    "accuracy_bonus": 0
+  },
+  "actions": [
+    "melee_attack",
+    "shoot"
+  ],
+  "potions": {
+    "health": 1,
+    "mana": 1
+  },
+  "ranged_weapon": {
+    "name": "Короткий лук",
+    "attack_type": "ranged",
+    "skill_id": "bow",
+    "minimum_attack_range_hexes": 2,
+    "attack_range_hexes": 4,
+    "damage_dice": "1d6",
+    "accuracy_bonus": 0
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "goblin",
+  "name": "Гоблин",
+  "base_attributes": {
+    "strength": 1,
+    "dexterity": 1,
+    "endurance": 1,
+    "intelligence": 1
+  }
+}

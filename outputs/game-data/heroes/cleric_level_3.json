@@ -1,0 +1,46 @@
+{
+  "id": "cleric_level_3",
+  "name": "Бран",
+  "class_id": "cleric",
+  "race_id": "human",
+  "level": 3,
+  "level_up_attribute_allocations": {
+    "strength": 1,
+    "dexterity": 1,
+    "endurance": 2,
+    "intelligence": 2
+  },
+  "attributes": {
+    "strength": 4,
+    "dexterity": 4,
+    "endurance": 5,
+    "intelligence": 5
+  },
+  "skills": {
+    "mace": 3,
+    "chain_armor": 2
+  },
+  "unspent_attribute_points": 0,
+  "unspent_skill_points": 1,
+  "armor": {
+    "name": "Кольчуга",
+    "skill_id": "chain_armor"
+  },
+  "defense_equipment_bonus": 2,
+  "weapon": {
+    "name": "Булава",
+    "attack_type": "melee",
+    "skill_id": "mace",
+    "attack_range_hexes": 1,
+    "damage_dice": "1d6",
+    "accuracy_bonus": 0
+  },
+  "actions": [
+    "melee_attack",
+    "quick_heal"
+  ],
+  "potions": {
+    "health": 1,
+    "mana": 1
+  }
+}
