@@ -5,6 +5,7 @@ const CATALOG = preload("res://scripts/data_catalog.gd")
 const BATTLE = preload("res://scripts/battle_state.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
+const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-sheet.png")
 const CLERIC: Texture2D = preload("res://assets/human-cleric.png")
 const ARCHER: Texture2D = preload("res://assets/human-archer.png")
 const ARCHER_SPRITE: Texture2D = preload("res://assets/human-archer-sprite.png")
@@ -182,6 +183,9 @@ func _draw_units() -> void:
 
 
 func _draw_animated_unit(unit) -> void:
+	if unit.is_hero and unit.class_id() == "warrior":
+		_draw_warrior_animation(unit)
+		return
 	var pose: Dictionary = _unit_pose(unit)
 	var position: Vector2 = pose["position"]
 	var rotation: float = pose["rotation"]
@@ -193,6 +197,50 @@ func _draw_animated_unit(unit) -> void:
 	else:
 		_draw_enemy(unit, Vector2.ZERO, tint)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_warrior_animation(warrior) -> void:
+	var unit_id: int = warrior.get_instance_id()
+	var row: int = 0
+	var column: int = 0
+	var tint := Color.WHITE
+	if movement_animations.has(unit_id):
+		var movement: Dictionary = movement_animations[unit_id]
+		var step: float = float(movement["elapsed"]) / float(movement["duration"])
+		column = clampi(int(step * 4.0), 0, 3)
+	if action_animations.has(unit_id):
+		var action: Dictionary = action_animations[unit_id]
+		var phase: float = clampf(float(action["elapsed"]) / float(action["duration"]), 0.0, 1.0)
+		match str(action["kind"]):
+			"melee":
+				row = 1
+				column = clampi(int(phase * 4.0), 0, 3)
+			"recover":
+				row = 2
+				column = 3 - clampi(int(phase * 4.0), 0, 3)
+	if impact_animations.has(unit_id):
+		var impact: Dictionary = impact_animations[unit_id]
+		var impact_phase: float = float(impact["elapsed"]) / float(impact["duration"])
+		if impact_phase >= 0.0 and impact_phase < 1.0:
+			row = 2
+			column = 0 if impact_phase < 0.5 else 1
+			tint = Color(1.0, 0.68, 0.68)
+	if not warrior.conscious():
+		row = 2
+		column = 3
+		if fall_animations.has(unit_id):
+			var fall: Dictionary = fall_animations[unit_id]
+			var fall_phase: float = float(fall["elapsed"]) / float(fall["duration"])
+			if fall_phase < 0.0:
+				row = 0
+				column = 0
+			else:
+				column = clampi(int(fall_phase * 4.0), 0, 3)
+		if column == 3:
+			tint = Color(0.6, 0.6, 0.64, 0.9)
+	var center: Vector2 = _unit_position(warrior)
+	var source := Rect2(float(column * 362), float(row * 362), 362.0, 362.0)
+	draw_texture_rect_region(WARRIOR_ANIMATION, Rect2(center - Vector2(64, 72), Vector2(128, 128)), source, tint)
 
 
 func _draw_cell_frame(cell: Vector2i, color: Color, selected: bool) -> void:
@@ -772,8 +820,9 @@ func _on_visual_event(event: Dictionary) -> void:
 	match kind:
 		"melee":
 			if target != null:
-				visual_effects.append({"kind": "slash", "position": destination, "direction": direction, "elapsed": -0.12, "duration": 0.25})
-				_schedule_impact(event, target, 0.15)
+				var impact_delay := 0.21 if unit.is_hero and unit.class_id() == "warrior" else 0.15
+				visual_effects.append({"kind": "slash", "position": destination, "direction": direction, "elapsed": -impact_delay, "duration": 0.25})
+				_schedule_impact(event, target, impact_delay)
 		"shoot", "fire_arrow":
 			var travel_time: float = clampf(origin.distance_to(destination) / (650.0 if kind == "shoot" else 570.0), 0.2, 0.72)
 			visual_effects.append({"kind": "arrow" if kind == "shoot" else "fire", "start": origin, "end": destination, "elapsed": 0.0, "duration": travel_time})
