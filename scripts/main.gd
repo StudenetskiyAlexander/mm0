@@ -40,7 +40,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if setup_overlay.visible:
+	if setup_overlay.visible or log_panel.visible:
 		return
 	battle.tick(delta)
 	queue_redraw()
@@ -51,9 +51,13 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if log_panel.visible:
-			if event.keycode == KEY_ESCAPE:
+			if event.keycode == KEY_ESCAPE or event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 				log_panel.hide()
 				get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			log_panel.show()
+			get_viewport().set_input_as_handled()
 			return
 		_handle_key(event)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -323,7 +327,7 @@ func _draw_journal_preview() -> void:
 	var rect := Rect2(370, 913, 1185, 72)
 	draw_rect(rect, Color(0.04, 0.05, 0.06, 0.82), true)
 	draw_rect(rect, Color("b59b63"), false, 2.0)
-	_text("ЖУРНАЛ БОЯ  ·  НАЖМИТЕ ДЛЯ ИСТОРИИ", Vector2(385, 934), 13, Color("e6cb87"))
+	_text("ЖУРНАЛ БОЯ  ·  НАЖМИТЕ ИЛИ ENTER ДЛЯ ИСТОРИИ", Vector2(385, 934), 13, Color("e6cb87"))
 	var latest := "Ожидание боя"
 	if not combat_log.is_empty():
 		latest = combat_log.back()
@@ -434,11 +438,11 @@ func _build_log_panel() -> void:
 	padding.add_child(body)
 	var header := HBoxContainer.new()
 	body.add_child(header)
-	var title := _label("ЖУРНАЛ БОЯ", 26, Color("ead28f"))
+	var title := _label("ЖУРНАЛ БОЯ · ПАУЗА", 26, Color("ead28f"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var close_button := Button.new()
-	close_button.text = "Закрыть  Esc"
+	close_button.text = "Закрыть  Enter / Esc"
 	close_button.pressed.connect(func(): log_panel.hide())
 	header.add_child(close_button)
 	log_content = RichTextLabel.new()
