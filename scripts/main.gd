@@ -114,7 +114,7 @@ func _handle_click(point: Vector2) -> void:
 
 func _draw() -> void:
 	draw_texture_rect(BACKGROUND, Rect2(Vector2.ZERO, SCREEN_SIZE), false)
-	_draw_top_effects()
+	_draw_top_status()
 	_draw_board()
 	_draw_units()
 	_draw_hero_panel()
@@ -123,16 +123,7 @@ func _draw() -> void:
 		_draw_end_banner()
 
 
-func _draw_top_effects() -> void:
-	var labels := ["ОГОНЬ", "ВЕТЕР", "ЩИТ", "ЗРЕНИЕ"]
-	var colors := [Color("e66d29"), Color("9bd5f0"), Color("6fbde4"), Color("b885dc")]
-	for index in range(4):
-		var rect := Rect2(226 + index * 82, 9, 75, 76)
-		draw_rect(rect, Color(0.05, 0.06, 0.08, 0.88), true)
-		draw_rect(rect, Color("b89b63"), false, 3.0)
-		draw_circle(rect.position + Vector2(37, 29), 18.0, colors[index].darkened(0.55))
-		draw_circle(rect.position + Vector2(37, 29), 12.0, colors[index])
-		_text(labels[index], rect.position + Vector2(7, 66), 11, Color("eee6ce"))
+func _draw_top_status() -> void:
 	draw_rect(Rect2(1280, 12, 296, 69), Color(0.04, 0.05, 0.06, 0.82), true)
 	draw_rect(Rect2(1280, 12, 296, 69), Color("b89b63"), false, 2.0)
 	_text("ВРАГИ: %d / %d" % [battle.defeated_enemies, battle.defeated_enemies + battle.enemies_remaining_to_spawn + _living_enemy_count()], Vector2(1295, 42), 20, Color("f2e1ae"))
