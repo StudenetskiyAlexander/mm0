@@ -7,6 +7,7 @@ const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const CLERIC: Texture2D = preload("res://assets/human-cleric.png")
 const ARCHER: Texture2D = preload("res://assets/human-archer.png")
+const ARCHER_SPRITE: Texture2D = preload("res://assets/human-archer-sprite.png")
 
 const SCREEN_SIZE := Vector2(1600, 1000)
 const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
@@ -182,20 +183,7 @@ func _draw_hero_sprite(hero) -> void:
 		"cleric":
 			draw_texture_rect(CLERIC, Rect2(center - Vector2(52, 55), Vector2(104, 110)), false, tint)
 		"archer":
-			_draw_procedural_archer(center, tint)
-
-
-func _draw_procedural_archer(center: Vector2, tint: Color) -> void:
-	var green := Color(0.13, 0.30, 0.16, tint.a)
-	var gold := Color(0.72, 0.62, 0.32, tint.a)
-	draw_line(center + Vector2(-11, 6), center + Vector2(-22, 38), green, 11.0, true)
-	draw_line(center + Vector2(5, 6), center + Vector2(14, 38), green, 11.0, true)
-	draw_colored_polygon(PackedVector2Array([center + Vector2(-20, -25), center + Vector2(11, -26), center + Vector2(21, 14), center + Vector2(-28, 15)]), green)
-	draw_circle(center + Vector2(-3, -33), 13.0, Color(0.83, 0.66, 0.48, tint.a))
-	draw_arc(center + Vector2(22, -4), 33.0, -1.2, 1.2, 24, gold, 4.0, true)
-	draw_line(center + Vector2(34, -35), center + Vector2(34, 27), Color(0.85, 0.85, 0.78, tint.a), 1.5, true)
-	draw_line(center + Vector2(1, -11), center + Vector2(54, -12), gold, 3.0, true)
-	draw_line(center + Vector2(1, -11), center + Vector2(52, -12), Color("f2e4bb"), 1.0, true)
+			draw_texture_rect(ARCHER_SPRITE, Rect2(center - Vector2(45, 72), Vector2(90, 135)), false, tint)
 
 
 func _draw_enemy(enemy) -> void:
