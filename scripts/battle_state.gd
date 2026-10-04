@@ -277,7 +277,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	if attack_total >= defense_total:
 		var damage_dice := str(weapon.get("damage_dice", "1d4"))
 		var die_damage := _roll_dice(damage_dice)
-		var strength_bonus := 0 if ranged else attacker.attribute("strength")
+		var strength_bonus: int = 0 if ranged else attacker.attribute("strength")
 		var damage := die_damage + strength_bonus
 		if ranged:
 			_log(details + " Попадание. Урон: %s (%d) = %d." % [damage_dice, die_damage, damage])

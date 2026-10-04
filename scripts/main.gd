@@ -209,7 +209,7 @@ func _draw_procedural_archer(center: Vector2, tint: Color) -> void:
 
 func _draw_enemy(enemy) -> void:
 	var center: Vector2 = BOARD.center(enemy.cell)
-	var enemy_id := enemy.id()
+	var enemy_id: String = enemy.id()
 	if enemy_id == "forest_wolf":
 		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(61, 49), Vector2(122, 98)), Rect2(1262, 436, 306, 170))
 	else:
