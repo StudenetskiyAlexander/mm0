@@ -103,7 +103,7 @@ func _handle_click(point: Vector2) -> void:
 			return
 	for index in range(battle.heroes.size()):
 		var top := 109.0 + float(index) * 211.0
-		if Rect2(35, top + 4, 178, 143).has_point(point):
+		if Rect2(14, top + 9, 192, 139).has_point(point):
 			battle.select_hero(index)
 			queue_redraw()
 			return
@@ -217,18 +217,18 @@ func _draw_hero_panel() -> void:
 		var hero = battle.heroes[index]
 		var selected: bool = battle.selected_hero == index and hero.ready()
 		var edge := Color("f6cf62") if selected else (Color("3dbe74") if hero.ready() else Color("717b7d"))
-		var portrait := Rect2(39, top + 9, 174, 139)
+		var portrait := Rect2(14, top + 9, 192, 139)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
 		_draw_portrait(hero, portrait)
-		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(47, top + 141), 14, Color.WHITE)
-		_draw_resource_bar(Rect2(40, top + 155, 174, 17), hero.health, hero.max_health(), Color("d83834"))
-		_draw_resource_bar(Rect2(40, top + 178, 174, 17), hero.mana, hero.max_mana(), Color("3187dc"))
+		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(21, top + 141), 14, Color.WHITE)
+		_draw_resource_bar(Rect2(14, top + 155, 192, 17), hero.health, hero.max_health(), Color("d83834"))
+		_draw_resource_bar(Rect2(14, top + 178, 192, 17), hero.mana, hero.max_mana(), Color("3187dc"))
 		for slot in range(6):
 			_draw_action_slot(hero, top, slot)
 		if not hero.conscious():
 			var status := "МЁРТВ" if not hero.alive() else "БЕЗ СОЗНАНИЯ"
-			_text(status, Vector2(52, top + 78), 16, Color("f48a85"))
+			_text(status, Vector2(27, top + 78), 16, Color("f48a85"))
 		elif hero.cooldown > 0.0:
 			_text("Отдых %.1f c" % hero.cooldown, Vector2(237, top + 194), 12, Color("dfbd78"))
 
@@ -254,7 +254,7 @@ func _draw_resource_bar(rect: Rect2, value: int, maximum: int, fill_color: Color
 	draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2((rect.size.x - 6.0) * ratio, rect.size.y - 6.0)), fill_color, true)
 	draw_rect(rect, Color("b7a274"), false, 2.0)
 	var label := "%d/%d" % [value, maximum]
-	_text(label, rect.position + Vector2(58, 13), 14, Color.WHITE)
+	_text(label, rect.position + Vector2(67, 13), 14, Color.WHITE)
 
 
 func _slot_rect(top: float, slot: int) -> Rect2:
