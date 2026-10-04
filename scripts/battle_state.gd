@@ -98,13 +98,19 @@ func perform_action(index: int, action_id: String) -> bool:
 			return false
 		hero.health_potions -= 1
 		var recovered: int = hero.restore_health(10)
-		_log("%s выпивает зелье здоровья: +%d здоровья (%d/%d)." % [hero.name(), recovered, hero.health, hero.max_health()])
+		if recovered > 0:
+			_log("%s выпивает зелье здоровья: +%d здоровья (%d/%d)." % [hero.name(), recovered, hero.health, hero.max_health()])
+		else:
+			_log("%s выпивает зелье здоровья при полном запасе (%d/%d)." % [hero.name(), hero.health, hero.max_health()])
 	elif action_id == "mana_potion":
 		if hero.mana_potions <= 0:
 			return false
 		hero.mana_potions -= 1
 		var recovered: int = hero.restore_mana(10)
-		_log("%s выпивает зелье маны: +%d маны (%d/%d)." % [hero.name(), recovered, hero.mana, hero.max_mana()])
+		if recovered > 0:
+			_log("%s выпивает зелье маны: +%d маны (%d/%d)." % [hero.name(), recovered, hero.mana, hero.max_mana()])
+		else:
+			_log("%s выпивает зелье маны при полном запасе (%d/%d)." % [hero.name(), hero.mana, hero.max_mana()])
 	elif not hero.has_action(action_id):
 		return false
 	elif action_id == "melee_attack":
@@ -139,7 +145,10 @@ func perform_action(index: int, action_id: String) -> bool:
 			_log("%s применяет Быстрое лечение без цели. Потрачено 5 маны." % hero.name())
 		else:
 			var recovered: int = target.restore_health(6)
-			_log("%s лечит %s: +%d здоровья (%d/%d); −5 маны." % [hero.name(), target.name(), recovered, target.health, target.max_health()])
+			if recovered > 0:
+				_log("%s лечит %s: +%d здоровья (%d/%d); −5 маны." % [hero.name(), target.name(), recovered, target.health, target.max_health()])
+			else:
+				_log("%s лечит %s: здоровье уже полное (%d/%d); −5 маны." % [hero.name(), target.name(), target.health, target.max_health()])
 	else:
 		return false
 	hero.cooldown = ACTION_COOLDOWN
@@ -273,16 +282,36 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var equipment_bonus := int(target.profile.get("defense_equipment_bonus", 0))
 	var defense_total: int = target.defense()
 	var action_name := "стреляет в" if ranged else "атакует"
-	var details := "%s %s %s. Точность: %s %d + навык %s %d + оружие %d + 1д20 (%d) = %d. Защита: 10 + Ловкость %d + %s %d + снаряжение %d = %d." % [attacker.name(), action_name, target.name(), attribute_name, attribute_value, skill_name, skill_value, weapon_bonus, die, attack_total, target_dexterity, armor_name, armor_skill, equipment_bonus, defense_total]
+	var attack_parts := PackedStringArray()
+	if attribute_value != 0:
+		attack_parts.append("%s %d" % [attribute_name, attribute_value])
+	if skill_value != 0:
+		attack_parts.append("навык %s %d" % [skill_name, skill_value])
+	if weapon_bonus != 0:
+		attack_parts.append("оружие %d" % weapon_bonus)
+	attack_parts.append("1д20 (%d)" % die)
+	var defense_parts := PackedStringArray(["10"])
+	if target_dexterity != 0:
+		defense_parts.append("Ловкость %d" % target_dexterity)
+	if armor_skill != 0:
+		defense_parts.append("%s %d" % [armor_name, armor_skill])
+	if equipment_bonus != 0:
+		defense_parts.append("снаряжение %d" % equipment_bonus)
+	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), " + ".join(attack_parts), attack_total, " + ".join(defense_parts), defense_total]
 	if attack_total >= defense_total:
 		var damage_dice := str(weapon.get("damage_dice", "1d4"))
 		var die_damage := _roll_dice(damage_dice)
 		var strength_bonus: int = 0 if ranged else attacker.attribute("strength")
 		var damage := die_damage + strength_bonus
-		if ranged:
-			_log(details + " Попадание. Урон: %s (%d) = %d." % [damage_dice, die_damage, damage])
-		else:
-			_log(details + " Попадание. Урон: %s (%d) + Сила (%d) = %d." % [damage_dice, die_damage, strength_bonus, damage])
+		var damage_parts := PackedStringArray()
+		if die_damage != 0:
+			damage_parts.append("%s (%d)" % [damage_dice, die_damage])
+		if strength_bonus != 0:
+			damage_parts.append("Сила (%d)" % strength_bonus)
+		var damage_details: String = "Урон: %d" % damage
+		if not damage_parts.is_empty():
+			damage_details = "Урон: %s = %d" % [" + ".join(damage_parts), damage]
+		_log(details + " Попадание. %s." % damage_details)
 		_apply_damage(attacker, target, damage)
 	else:
 		_log(details + " Промах.")
