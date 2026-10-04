@@ -6,6 +6,12 @@ const BATTLE = preload("res://scripts/battle_state.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-sheet.png")
+const MAGE_ANIMATION: Texture2D = preload("res://assets/mage-animation-sheet.png")
+const CLERIC_ANIMATION: Texture2D = preload("res://assets/cleric-animation-sheet.png")
+const ARCHER_ANIMATION: Texture2D = preload("res://assets/archer-animation-sheet.png")
+const SMALL_GOBLIN_ANIMATION: Texture2D = preload("res://assets/small-goblin-animation-sheet.png")
+const ARMORED_GOBLIN_ANIMATION: Texture2D = preload("res://assets/armored-goblin-animation-sheet.png")
+const WOLF_ANIMATION_SOURCE: Texture2D = preload("res://assets/wolf-animation-sheet.png")
 const CLERIC: Texture2D = preload("res://assets/human-cleric.png")
 const ARCHER: Texture2D = preload("res://assets/human-archer.png")
 const ARCHER_SPRITE: Texture2D = preload("res://assets/human-archer-sprite.png")
@@ -36,10 +42,12 @@ var spawn_animations: Dictionary = {}
 var fall_animations: Dictionary = {}
 var death_animations: Dictionary = {}
 var visual_effects: Array[Dictionary] = []
+var wolf_animation: Texture2D
 
 
 func _ready() -> void:
 	font = get_theme_default_font()
+	wolf_animation = _prepare_wolf_animation()
 	catalog.load_all()
 	battle.event_logged.connect(_on_battle_event)
 	battle.battle_ended.connect(_on_battle_end)
@@ -183,8 +191,9 @@ func _draw_units() -> void:
 
 
 func _draw_animated_unit(unit) -> void:
-	if unit.is_hero and unit.class_id() == "warrior":
-		_draw_warrior_animation(unit)
+	var sheet: Texture2D = _animation_sheet(unit)
+	if sheet != null:
+		_draw_frame_unit(unit, sheet)
 		return
 	var pose: Dictionary = _unit_pose(unit)
 	var position: Vector2 = pose["position"]
@@ -199,14 +208,50 @@ func _draw_animated_unit(unit) -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func _draw_warrior_animation(warrior) -> void:
-	var unit_id: int = warrior.get_instance_id()
+func _animation_sheet(unit) -> Texture2D:
+	if unit.is_hero:
+		match unit.class_id():
+			"warrior":
+				return WARRIOR_ANIMATION
+			"mage":
+				return MAGE_ANIMATION
+			"cleric":
+				return CLERIC_ANIMATION
+			"archer":
+				return ARCHER_ANIMATION
+	else:
+		match unit.id():
+			"small_goblin":
+				return SMALL_GOBLIN_ANIMATION
+			"armored_goblin":
+				return ARMORED_GOBLIN_ANIMATION
+			"forest_wolf":
+				return wolf_animation
+	return null
+
+
+func _prepare_wolf_animation() -> Texture2D:
+	var pixels: Image = WOLF_ANIMATION_SOURCE.get_image()
+	pixels.convert(Image.FORMAT_RGBA8)
+	for y in range(pixels.get_height()):
+		for x in range(pixels.get_width()):
+			var color: Color = pixels.get_pixel(x, y)
+			var magenta: float = clampf((minf(color.r, color.b) - color.g * 1.25 - 0.10) * 4.0, 0.0, 1.0)
+			if magenta > 0.0:
+				color.a *= 1.0 - magenta
+				pixels.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(pixels)
+
+
+func _draw_frame_unit(unit, sheet: Texture2D) -> void:
+	var unit_id: int = unit.get_instance_id()
+	var fall_row: int = 3 if unit.is_hero and unit.class_id() != "warrior" else 2
 	var row: int = 0
 	var column: int = 0
-	var tint := Color.WHITE
+	var tint: Color = Color.WHITE
 	if movement_animations.has(unit_id):
 		var movement: Dictionary = movement_animations[unit_id]
-		var step: float = float(movement["elapsed"]) / float(movement["duration"])
+		var step: float = clampf(float(movement["elapsed"]) / float(movement["duration"]), 0.0, 1.0)
 		column = clampi(int(step * 4.0), 0, 3)
 	if action_animations.has(unit_id):
 		var action: Dictionary = action_animations[unit_id]
@@ -215,18 +260,22 @@ func _draw_warrior_animation(warrior) -> void:
 			"melee":
 				row = 1
 				column = clampi(int(phase * 4.0), 0, 3)
+			"shoot", "fire_arrow", "quick_heal":
+				if unit.is_hero:
+					row = 2
+					column = clampi(int(phase * 4.0), 0, 3)
 			"recover":
-				row = 2
+				row = fall_row
 				column = 3 - clampi(int(phase * 4.0), 0, 3)
 	if impact_animations.has(unit_id):
 		var impact: Dictionary = impact_animations[unit_id]
 		var impact_phase: float = float(impact["elapsed"]) / float(impact["duration"])
 		if impact_phase >= 0.0 and impact_phase < 1.0:
-			row = 2
+			row = fall_row
 			column = 0 if impact_phase < 0.5 else 1
 			tint = Color(1.0, 0.68, 0.68)
-	if not warrior.conscious():
-		row = 2
+	if unit.is_hero and not unit.conscious():
+		row = fall_row
 		column = 3
 		if fall_animations.has(unit_id):
 			var fall: Dictionary = fall_animations[unit_id]
@@ -238,9 +287,31 @@ func _draw_warrior_animation(warrior) -> void:
 				column = clampi(int(fall_phase * 4.0), 0, 3)
 		if column == 3:
 			tint = Color(0.6, 0.6, 0.64, 0.9)
-	var center: Vector2 = _unit_position(warrior)
-	var source := Rect2(float(column * 362), float(row * 362), 362.0, 362.0)
-	draw_texture_rect_region(WARRIOR_ANIMATION, Rect2(center - Vector2(64, 72), Vector2(128, 128)), source, tint)
+	if death_animations.has(unit_id):
+		var death: Dictionary = death_animations[unit_id]
+		var death_phase: float = float(death["elapsed"]) / float(death["duration"])
+		row = fall_row
+		if death_phase < 0.0:
+			row = 0
+			column = 0
+		else:
+			column = clampi(int(death_phase * 4.0), 0, 3)
+			tint.a = 1.0 - clampf((death_phase - 0.7) / 0.3, 0.0, 1.0)
+	if spawn_animations.has(unit_id):
+		var spawn: Dictionary = spawn_animations[unit_id]
+		tint.a *= clampf(float(spawn["elapsed"]) / float(spawn["duration"]), 0.0, 1.0)
+	var frame_width: float = float(sheet.get_width()) / 4.0
+	var frame_height: float = float(sheet.get_height()) / float(fall_row + 1)
+	var source := Rect2(float(column) * frame_width, float(row) * frame_height, frame_width, frame_height)
+	var size := Vector2(128, 128) if unit.is_hero else Vector2(126, 126)
+	if not unit.is_hero and unit.id() == "forest_wolf":
+		size = Vector2(148, 124)
+	var center: Vector2 = _unit_position(unit)
+	draw_texture_rect_region(sheet, Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size), source, tint)
+	if not unit.is_hero and unit.conscious():
+		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
+		draw_rect(Rect2(center + Vector2(-35, -58), Vector2(70, 6)), Color(0.12, 0.04, 0.04, 0.8), true)
+		draw_rect(Rect2(center + Vector2(-34, -57), Vector2(68.0 * ratio, 4)), Color("d84b39"), true)
 
 
 func _draw_cell_frame(cell: Vector2i, color: Color, selected: bool) -> void:
@@ -813,27 +884,30 @@ func _on_visual_event(event: Dictionary) -> void:
 		var toward_target: Vector2 = (destination - origin).normalized()
 		if toward_target != Vector2.ZERO:
 			direction = toward_target
-	var action_duration := 0.38
+	var action_duration := 0.44
 	if kind == "shoot" or kind == "fire_arrow":
-		action_duration = 0.48
+		action_duration = 0.56
+	elif kind == "quick_heal":
+		action_duration = 0.52
 	action_animations[unit_id] = {"kind": kind, "direction": direction, "elapsed": 0.0, "duration": action_duration}
 	match kind:
 		"melee":
 			if target != null:
-				var impact_delay := 0.21 if unit.is_hero and unit.class_id() == "warrior" else 0.15
+				var impact_delay: float = 0.22
 				visual_effects.append({"kind": "slash", "position": destination, "direction": direction, "elapsed": -impact_delay, "duration": 0.25})
 				_schedule_impact(event, target, impact_delay)
 		"shoot", "fire_arrow":
+			var launch_delay: float = 0.32
 			var travel_time: float = clampf(origin.distance_to(destination) / (650.0 if kind == "shoot" else 570.0), 0.2, 0.72)
-			visual_effects.append({"kind": "arrow" if kind == "shoot" else "fire", "start": origin, "end": destination, "elapsed": 0.0, "duration": travel_time})
+			visual_effects.append({"kind": "arrow" if kind == "shoot" else "fire", "start": origin, "end": destination, "elapsed": -launch_delay, "duration": travel_time})
 			if target != null:
-				_schedule_impact(event, target, travel_time)
+				_schedule_impact(event, target, launch_delay + travel_time)
 		"quick_heal":
 			var heal_position: Vector2 = destination if target != null else origin
-			visual_effects.append({"kind": "pulse", "position": heal_position, "color": Color("80e6aa"), "elapsed": 0.0, "duration": 0.55})
+			visual_effects.append({"kind": "pulse", "position": heal_position, "color": Color("80e6aa"), "elapsed": -0.25, "duration": 0.55})
 			var recovered: int = int(event.get("amount", 0))
 			if recovered > 0:
-				visual_effects.append({"kind": "text", "position": heal_position, "label": "+%d" % recovered, "color": Color("a9f2ba"), "elapsed": 0.0, "duration": 0.7})
+				visual_effects.append({"kind": "text", "position": heal_position, "label": "+%d" % recovered, "color": Color("a9f2ba"), "elapsed": -0.25, "duration": 0.7})
 			if target != null and bool(event.get("revived", false)):
 				var target_id: int = target.get_instance_id()
 				fall_animations.erase(target_id)
