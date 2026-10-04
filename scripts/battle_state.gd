@@ -2,6 +2,7 @@ extends RefCounted
 
 signal event_logged(message: String)
 signal battle_ended(victory: bool)
+signal visual_event(event: Dictionary)
 
 const BOARD = preload("res://scripts/hex_board.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
@@ -102,6 +103,7 @@ func perform_action(index: int, action_id: String) -> bool:
 			_log("%s выпивает зелье здоровья: +%d здоровья (%d/%d)." % [hero.name(), recovered, hero.health, hero.max_health()])
 		else:
 			_log("%s выпивает зелье здоровья при полном запасе (%d/%d)." % [hero.name(), hero.health, hero.max_health()])
+		visual_event.emit({"kind": "health_potion", "unit": hero, "amount": recovered})
 	elif action_id == "mana_potion":
 		if hero.mana_potions <= 0:
 			return false
@@ -111,18 +113,21 @@ func perform_action(index: int, action_id: String) -> bool:
 			_log("%s выпивает зелье маны: +%d маны (%d/%d)." % [hero.name(), recovered, hero.mana, hero.max_mana()])
 		else:
 			_log("%s выпивает зелье маны при полном запасе (%d/%d)." % [hero.name(), hero.mana, hero.max_mana()])
+		visual_event.emit({"kind": "mana_potion", "unit": hero, "amount": recovered})
 	elif not hero.has_action(action_id):
 		return false
 	elif action_id == "melee_attack":
 		var target = _nearest_enemy(hero.cell, 1, 1)
 		if target == null:
 			_log("%s атакует пустую клетку." % hero.name())
+			visual_event.emit({"kind": "melee", "unit": hero, "target": null, "hit": false, "damage": 0})
 		else:
 			_physical_attack(hero, target, false)
 	elif action_id == "shoot":
 		var target = _nearest_enemy(hero.cell, 2, 4)
 		if target == null:
 			_log("%s выпускает стрелу, но подходящей цели нет." % hero.name())
+			visual_event.emit({"kind": "shoot", "unit": hero, "target": null, "hit": false, "damage": 0})
 		else:
 			_physical_attack(hero, target, true)
 	elif action_id == "fire_arrow":
@@ -132,10 +137,12 @@ func perform_action(index: int, action_id: String) -> bool:
 		var target = _nearest_enemy(hero.cell, 1, 6)
 		if target == null:
 			_log("%s выпускает Огненную стрелу без цели. Потрачено 5 маны." % hero.name())
+			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": null, "hit": false, "damage": 0})
 		else:
 			var damage := _roll_dice("1d8")
 			_log("%s применяет Огненную стрелу к %s: магия попадает всегда, 1д8 = %d урона; −5 маны." % [hero.name(), target.name(), damage])
 			_apply_damage(hero, target, damage)
+			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": target, "hit": true, "damage": damage})
 	elif action_id == "quick_heal":
 		if hero.mana < 5:
 			return false
@@ -143,12 +150,15 @@ func perform_action(index: int, action_id: String) -> bool:
 		var target = _lowest_health_hero()
 		if target == null:
 			_log("%s применяет Быстрое лечение без цели. Потрачено 5 маны." % hero.name())
+			visual_event.emit({"kind": "quick_heal", "unit": hero, "target": null, "amount": 0, "revived": false})
 		else:
+			var was_unconscious: bool = not target.conscious()
 			var recovered: int = target.restore_health(6)
 			if recovered > 0:
 				_log("%s лечит %s: +%d здоровья (%d/%d); −5 маны." % [hero.name(), target.name(), recovered, target.health, target.max_health()])
 			else:
 				_log("%s лечит %s: здоровье уже полное (%d/%d); −5 маны." % [hero.name(), target.name(), target.health, target.max_health()])
+			visual_event.emit({"kind": "quick_heal", "unit": hero, "target": target, "amount": recovered, "revived": was_unconscious and target.conscious()})
 	else:
 		return false
 	hero.cooldown = ACTION_COOLDOWN
@@ -177,6 +187,7 @@ func _update_enemy(enemy, delta: float) -> void:
 		if next_cell.x < 0:
 			enemy.movement_progress = 1.0
 			return
+		visual_event.emit({"kind": "move", "unit": enemy, "from_cell": enemy.cell, "to_cell": next_cell, "speed": speed})
 		enemy.cell = next_cell
 		enemy.movement_progress -= 1.0
 		steps += 1
@@ -206,6 +217,7 @@ func _spawn_enemy() -> bool:
 	var enemy = COMBATANT.new()
 	enemy.initialize(profile, false, cell)
 	enemies.append(enemy)
+	visual_event.emit({"kind": "spawn", "unit": enemy})
 	_log("На поле появляется %s (%d/%d здоровья)." % [enemy.name(), enemy.health, enemy.max_health()])
 	return true
 
@@ -282,6 +294,8 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var equipment_bonus := int(target.profile.get("defense_equipment_bonus", 0))
 	var defense_total: int = target.defense()
 	var action_name := "стреляет в" if ranged else "атакует"
+	var hit: bool = attack_total >= defense_total
+	var damage: int = 0
 	var attack_parts := PackedStringArray()
 	if attribute_value != 0:
 		attack_parts.append("%s %d" % [attribute_name, attribute_value])
@@ -298,11 +312,11 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	if equipment_bonus != 0:
 		defense_parts.append("снаряжение %d" % equipment_bonus)
 	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), " + ".join(attack_parts), attack_total, " + ".join(defense_parts), defense_total]
-	if attack_total >= defense_total:
+	if hit:
 		var damage_dice := str(weapon.get("damage_dice", "1d4"))
 		var die_damage := _roll_dice(damage_dice)
 		var strength_bonus: int = 0 if ranged else attacker.attribute("strength")
-		var damage := die_damage + strength_bonus
+		damage = die_damage + strength_bonus
 		var damage_parts := PackedStringArray()
 		if die_damage != 0:
 			damage_parts.append("%s (%d)" % [damage_dice, die_damage])
@@ -315,6 +329,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		_apply_damage(attacker, target, damage)
 	else:
 		_log(details + " Промах.")
+	visual_event.emit({"kind": "shoot" if ranged else "melee", "unit": attacker, "target": target, "hit": hit, "damage": damage})
 
 
 func _apply_damage(_attacker, target, amount: int) -> void:

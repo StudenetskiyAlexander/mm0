@@ -27,6 +27,14 @@ var hero_levels := {}
 var enemy_counts := {}
 var log_panel: PanelContainer
 var log_content: RichTextLabel
+var animation_time := 0.0
+var movement_animations: Dictionary = {}
+var action_animations: Dictionary = {}
+var impact_animations: Dictionary = {}
+var spawn_animations: Dictionary = {}
+var fall_animations: Dictionary = {}
+var death_animations: Dictionary = {}
+var visual_effects: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -34,6 +42,7 @@ func _ready() -> void:
 	catalog.load_all()
 	battle.event_logged.connect(_on_battle_event)
 	battle.battle_ended.connect(_on_battle_end)
+	battle.visual_event.connect(_on_visual_event)
 	_build_log_panel()
 	_build_setup_overlay()
 	queue_redraw()
@@ -43,6 +52,7 @@ func _process(delta: float) -> void:
 	if setup_overlay.visible or log_panel.visible:
 		return
 	battle.tick(delta)
+	_advance_animations(delta)
 	queue_redraw()
 
 
@@ -122,6 +132,7 @@ func _draw() -> void:
 	_draw_top_status()
 	_draw_board()
 	_draw_units()
+	_draw_visual_effects()
 	_draw_hero_panel()
 	_draw_journal_preview()
 	if battle.ended and not setup_overlay.visible:
@@ -156,16 +167,32 @@ func _draw_board() -> void:
 
 func _draw_units() -> void:
 	for enemy in battle.enemies:
-		if enemy.conscious():
-			_draw_cell_frame(enemy.cell, Color(0.92, 0.50, 0.24, 0.88), false)
-			_draw_enemy(enemy)
+		var enemy_id: int = enemy.get_instance_id()
+		if enemy.conscious() or death_animations.has(enemy_id):
+			if enemy.conscious():
+				_draw_cell_frame(enemy.cell, Color(0.92, 0.50, 0.24, 0.88), false)
+			_draw_animated_unit(enemy)
 	for index in range(battle.heroes.size()):
 		var hero = battle.heroes[index]
 		var active: bool = hero.ready()
 		var selected: bool = battle.selected_hero == index and active
 		var color := Color("f9d45c") if selected else (Color("43db80") if active else Color("92999d"))
 		_draw_cell_frame(hero.cell, color, selected)
-		_draw_hero_sprite(hero)
+		_draw_animated_unit(hero)
+
+
+func _draw_animated_unit(unit) -> void:
+	var pose: Dictionary = _unit_pose(unit)
+	var position: Vector2 = pose["position"]
+	var rotation: float = pose["rotation"]
+	var scale: float = pose["scale"]
+	var tint: Color = pose["tint"]
+	draw_set_transform(position, rotation, Vector2(scale, scale))
+	if unit.is_hero:
+		_draw_hero_sprite(unit, Vector2.ZERO, tint)
+	else:
+		_draw_enemy(unit, Vector2.ZERO, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_cell_frame(cell: Vector2i, color: Color, selected: bool) -> void:
@@ -176,9 +203,7 @@ func _draw_cell_frame(cell: Vector2i, color: Color, selected: bool) -> void:
 	draw_polyline(outline, color, 5.0 if selected else 3.0, true)
 
 
-func _draw_hero_sprite(hero) -> void:
-	var center: Vector2 = BOARD.center(hero.cell)
-	var tint := Color.WHITE if hero.conscious() else Color(0.5, 0.5, 0.5, 0.8)
+func _draw_hero_sprite(hero, center: Vector2, tint: Color) -> void:
 	match hero.class_id():
 		"warrior":
 			draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(52, 55), Vector2(104, 110)), Rect2(45, 46, 275, 246), tint)
@@ -190,17 +215,143 @@ func _draw_hero_sprite(hero) -> void:
 			draw_texture_rect(ARCHER_SPRITE, Rect2(center - Vector2(45, 72), Vector2(90, 135)), false, tint)
 
 
-func _draw_enemy(enemy) -> void:
-	var center: Vector2 = BOARD.center(enemy.cell)
+func _draw_enemy(enemy, center: Vector2, tint: Color) -> void:
 	var enemy_id: String = enemy.id()
 	if enemy_id == "forest_wolf":
-		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(61, 49), Vector2(122, 98)), Rect2(1262, 436, 306, 170))
+		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(61, 49), Vector2(122, 98)), Rect2(1262, 436, 306, 170), tint)
 	else:
-		var tint := Color(0.72, 0.78, 0.84) if enemy_id == "armored_goblin" else Color.WHITE
-		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(52, 51), Vector2(104, 102)), Rect2(1270, 270, 250, 166), tint)
+		var base_tint: Color = Color(0.72, 0.78, 0.84) if enemy_id == "armored_goblin" else Color.WHITE
+		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(52, 51), Vector2(104, 102)), Rect2(1270, 270, 250, 166), base_tint * tint)
+	if not enemy.conscious():
+		return
 	var ratio: float = clampf(float(enemy.health) / float(maxi(1, enemy.max_health())), 0.0, 1.0)
 	draw_rect(Rect2(center + Vector2(-35, -58), Vector2(70, 6)), Color(0.12, 0.04, 0.04, 0.8), true)
 	draw_rect(Rect2(center + Vector2(-34, -57), Vector2(68.0 * ratio, 4)), Color("d84b39"), true)
+
+
+func _unit_position(unit) -> Vector2:
+	var unit_id: int = unit.get_instance_id()
+	if not movement_animations.has(unit_id):
+		return BOARD.center(unit.cell)
+	var motion: Dictionary = movement_animations[unit_id]
+	var start: Vector2 = motion["from"]
+	var finish: Vector2 = motion["to"]
+	var progress: float = clampf(float(motion["elapsed"]) / float(motion["duration"]), 0.0, 1.0)
+	return start.lerp(finish, progress) + Vector2(0, -5.0 * sin(PI * progress))
+
+
+func _unit_pose(unit) -> Dictionary:
+	var unit_id: int = unit.get_instance_id()
+	var position: Vector2 = _unit_position(unit)
+	var rotation := 0.0
+	var scale := 1.0
+	var tint := Color.WHITE
+	if unit.conscious():
+		scale += 0.012 * sin(animation_time * 2.6 + float(unit_id % 17))
+	if spawn_animations.has(unit_id):
+		var spawn: Dictionary = spawn_animations[unit_id]
+		var spawn_progress: float = clampf(float(spawn["elapsed"]) / float(spawn["duration"]), 0.0, 1.0)
+		scale *= lerpf(0.65, 1.0, spawn_progress)
+		position.y -= 12.0 * (1.0 - spawn_progress)
+		tint.a *= spawn_progress
+	if action_animations.has(unit_id):
+		var action: Dictionary = action_animations[unit_id]
+		var action_progress: float = clampf(float(action["elapsed"]) / float(action["duration"]), 0.0, 1.0)
+		var motion_curve: float = sin(PI * action_progress)
+		var direction: Vector2 = action["direction"]
+		match str(action["kind"]):
+			"melee":
+				position += direction * (23.0 * motion_curve)
+				rotation += 0.10 * signf(direction.x) * motion_curve
+			"shoot":
+				position -= direction * (9.0 * motion_curve)
+				rotation -= 0.07 * signf(direction.x) * motion_curve
+			"fire_arrow":
+				position -= direction * (5.0 * motion_curve)
+				scale += 0.08 * motion_curve
+			"quick_heal":
+				position.y -= 6.0 * motion_curve
+				scale += 0.07 * motion_curve
+			"health_potion", "mana_potion":
+				position.y -= 8.0 * motion_curve
+				rotation += 0.05 * motion_curve
+			"recover":
+				position.y += 9.0 * (1.0 - action_progress)
+				rotation += 0.18 * (1.0 - action_progress)
+	if impact_animations.has(unit_id):
+		var impact: Dictionary = impact_animations[unit_id]
+		var impact_progress: float = float(impact["elapsed"]) / float(impact["duration"])
+		if impact_progress >= 0.0 and impact_progress < 1.0:
+			position.x += sin(impact_progress * TAU * 2.0) * 6.0 * (1.0 - impact_progress)
+			tint = tint.lerp(Color(1.0, 0.42, 0.42, tint.a), 0.75 * (1.0 - impact_progress))
+	if unit.is_hero and not unit.conscious():
+		var fall_progress := 1.0
+		if fall_animations.has(unit_id):
+			var fall: Dictionary = fall_animations[unit_id]
+			fall_progress = clampf(float(fall["elapsed"]) / float(fall["duration"]), 0.0, 1.0)
+		position.y += 9.0 * fall_progress
+		rotation += 0.18 * fall_progress
+		tint = tint.lerp(Color(0.52, 0.52, 0.56, 0.9), fall_progress)
+	if death_animations.has(unit_id):
+		var death: Dictionary = death_animations[unit_id]
+		var death_progress: float = clampf(float(death["elapsed"]) / float(death["duration"]), 0.0, 1.0)
+		position.y += 17.0 * death_progress
+		rotation += 0.3 * death_progress
+		scale *= 1.0 - 0.35 * death_progress
+		tint.a *= 1.0 - death_progress
+	return {"position": position, "rotation": rotation, "scale": scale, "tint": tint}
+
+
+func _draw_visual_effects() -> void:
+	for effect in visual_effects:
+		var elapsed: float = float(effect["elapsed"])
+		if elapsed < 0.0:
+			continue
+		var progress: float = clampf(elapsed / float(effect["duration"]), 0.0, 1.0)
+		match str(effect["kind"]):
+			"arrow", "fire":
+				_draw_projectile(effect, progress)
+			"slash":
+				var slash_position: Vector2 = effect["position"]
+				var slash_direction: Vector2 = effect["direction"]
+				var slash_color := Color(1.0, 0.95, 0.7, 1.0 - progress)
+				draw_arc(slash_position, 20.0 + 11.0 * progress, slash_direction.angle() - 0.9, slash_direction.angle() + 0.9, 24, slash_color, 4.0, true)
+			"pulse":
+				var pulse_position: Vector2 = effect["position"]
+				var pulse_color: Color = effect["color"]
+				pulse_color.a = 0.82 * (1.0 - progress)
+				draw_arc(pulse_position, 8.0 + 38.0 * progress, 0.0, TAU, 32, pulse_color, 3.0, true)
+			"burst":
+				var burst_position: Vector2 = effect["position"]
+				var burst_color := Color(1.0, 0.86, 0.65, 1.0 - progress)
+				for ray in range(6):
+					var angle: float = TAU * float(ray) / 6.0
+					var direction := Vector2(cos(angle), sin(angle))
+					draw_line(burst_position + direction * (6.0 + progress * 8.0), burst_position + direction * (16.0 + progress * 15.0), burst_color, 2.0, true)
+			"text":
+				var text_position: Vector2 = effect["position"]
+				var text_color: Color = effect["color"]
+				text_color.a = 1.0 - progress
+				_text(str(effect["label"]), text_position + Vector2(-24, -36 - progress * 25.0), 17, text_color)
+
+
+func _draw_projectile(effect: Dictionary, progress: float) -> void:
+	var start: Vector2 = effect["start"]
+	var finish: Vector2 = effect["end"]
+	var position: Vector2 = start.lerp(finish, progress)
+	var direction: Vector2 = (finish - start).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT
+	var normal := Vector2(-direction.y, direction.x)
+	if str(effect["kind"]) == "arrow":
+		draw_line(position - direction * 20.0, position + direction * 7.0, Color("f2e5bd"), 3.0, true)
+		draw_colored_polygon(PackedVector2Array([position + direction * 13.0, position + normal * 5.0, position - normal * 5.0]), Color("d9e5e8"))
+		draw_line(position - direction * 18.0, position - direction * 12.0 + normal * 5.0, Color("9bc6d2"), 2.0, true)
+		draw_line(position - direction * 18.0, position - direction * 12.0 - normal * 5.0, Color("9bc6d2"), 2.0, true)
+	else:
+		draw_line(position - direction * 22.0, position, Color(0.96, 0.25, 0.08, 0.55), 10.0, true)
+		draw_circle(position, 10.0, Color(1.0, 0.35, 0.09, 0.75))
+		draw_circle(position + direction * 3.0, 5.0, Color("ffefaa"))
 
 
 func _draw_hero_panel() -> void:
@@ -553,6 +704,7 @@ func _begin_battle() -> void:
 			chosen_enemies.append({"profile": profile, "count": count})
 	combat_log.clear()
 	log_content.text = ""
+	_clear_animations()
 	setup_notice.text = ""
 	setup_overlay.hide()
 	battle.start(chosen_heroes, chosen_enemies)
@@ -578,3 +730,154 @@ func _on_battle_event(message: String) -> void:
 
 func _on_battle_end(_victory: bool) -> void:
 	queue_redraw()
+
+
+func _clear_animations() -> void:
+	animation_time = 0.0
+	movement_animations.clear()
+	action_animations.clear()
+	impact_animations.clear()
+	spawn_animations.clear()
+	fall_animations.clear()
+	death_animations.clear()
+	visual_effects.clear()
+
+
+func _on_visual_event(event: Dictionary) -> void:
+	var kind: String = str(event.get("kind", ""))
+	var unit = event.get("unit", null)
+	if unit == null:
+		return
+	var unit_id: int = unit.get_instance_id()
+	if kind == "move":
+		_queue_movement(event)
+		return
+	var origin: Vector2 = _unit_position(unit)
+	if kind == "spawn":
+		spawn_animations[unit_id] = {"elapsed": 0.0, "duration": 0.32}
+		visual_effects.append({"kind": "pulse", "position": origin, "color": Color("d9a562"), "elapsed": 0.0, "duration": 0.42})
+		return
+	var target = event.get("target", null)
+	var direction := Vector2.RIGHT if unit.is_hero else Vector2.LEFT
+	var destination: Vector2 = origin + direction * 260.0
+	if target != null:
+		destination = _unit_position(target)
+		var toward_target: Vector2 = (destination - origin).normalized()
+		if toward_target != Vector2.ZERO:
+			direction = toward_target
+	var action_duration := 0.38
+	if kind == "shoot" or kind == "fire_arrow":
+		action_duration = 0.48
+	action_animations[unit_id] = {"kind": kind, "direction": direction, "elapsed": 0.0, "duration": action_duration}
+	match kind:
+		"melee":
+			if target != null:
+				visual_effects.append({"kind": "slash", "position": destination, "direction": direction, "elapsed": -0.12, "duration": 0.25})
+				_schedule_impact(event, target, 0.15)
+		"shoot", "fire_arrow":
+			var travel_time: float = clampf(origin.distance_to(destination) / (650.0 if kind == "shoot" else 570.0), 0.2, 0.72)
+			visual_effects.append({"kind": "arrow" if kind == "shoot" else "fire", "start": origin, "end": destination, "elapsed": 0.0, "duration": travel_time})
+			if target != null:
+				_schedule_impact(event, target, travel_time)
+		"quick_heal":
+			var heal_position: Vector2 = destination if target != null else origin
+			visual_effects.append({"kind": "pulse", "position": heal_position, "color": Color("80e6aa"), "elapsed": 0.0, "duration": 0.55})
+			var recovered: int = int(event.get("amount", 0))
+			if recovered > 0:
+				visual_effects.append({"kind": "text", "position": heal_position, "label": "+%d" % recovered, "color": Color("a9f2ba"), "elapsed": 0.0, "duration": 0.7})
+			if target != null and bool(event.get("revived", false)):
+				var target_id: int = target.get_instance_id()
+				fall_animations.erase(target_id)
+				action_animations[target_id] = {"kind": "recover", "direction": Vector2.ZERO, "elapsed": 0.0, "duration": 0.45}
+		"health_potion", "mana_potion":
+			var effect_color: Color = Color("ee6965") if kind == "health_potion" else Color("68b7f1")
+			visual_effects.append({"kind": "pulse", "position": origin, "color": effect_color, "elapsed": 0.0, "duration": 0.5})
+			var amount: int = int(event.get("amount", 0))
+			if amount > 0:
+				visual_effects.append({"kind": "text", "position": origin, "label": "+%d" % amount, "color": effect_color, "elapsed": 0.0, "duration": 0.7})
+
+
+func _queue_movement(event: Dictionary) -> void:
+	var unit = event["unit"]
+	var unit_id: int = unit.get_instance_id()
+	var start: Vector2 = BOARD.center(event["from_cell"])
+	var finish: Vector2 = BOARD.center(event["to_cell"])
+	var speed: float = maxf(0.1, float(event.get("speed", 1.0)))
+	var duration: float = clampf(0.95 / speed, 0.12, 0.95)
+	if movement_animations.has(unit_id):
+		var current: Dictionary = movement_animations[unit_id]
+		var queued: Array = current.get("queue", [])
+		if queued.is_empty():
+			start = current["to"]
+		else:
+			var last: Dictionary = queued.back()
+			start = last["to"]
+		queued.append({"from": start, "to": finish, "elapsed": 0.0, "duration": duration})
+		current["queue"] = queued
+		movement_animations[unit_id] = current
+	else:
+		movement_animations[unit_id] = {"from": start, "to": finish, "elapsed": 0.0, "duration": duration, "queue": []}
+
+
+func _schedule_impact(event: Dictionary, target, delay: float) -> void:
+	var target_id: int = target.get_instance_id()
+	var position: Vector2 = _unit_position(target)
+	if bool(event.get("hit", false)):
+		impact_animations[target_id] = {"elapsed": -delay, "duration": 0.32}
+		visual_effects.append({"kind": "burst", "position": position, "elapsed": -delay, "duration": 0.27})
+		var damage: int = int(event.get("damage", 0))
+		if damage > 0:
+			visual_effects.append({"kind": "text", "position": position, "label": "−%d" % damage, "color": Color("ffaaaa"), "elapsed": -delay, "duration": 0.75})
+		if target.health <= 0:
+			if target.is_hero:
+				fall_animations[target_id] = {"elapsed": -delay, "duration": 0.5}
+			else:
+				death_animations[target_id] = {"elapsed": -delay, "duration": 0.65}
+	else:
+		visual_effects.append({"kind": "text", "position": position, "label": "ПРОМАХ", "color": Color("eeeece"), "elapsed": -delay, "duration": 0.65})
+
+
+func _advance_animations(delta: float) -> void:
+	animation_time += delta
+	for key in movement_animations.keys():
+		var motion: Dictionary = movement_animations[key]
+		var queued: Array = motion.get("queue", [])
+		var remaining := delta
+		var finished := false
+		while remaining > 0.0:
+			var time_left: float = maxf(0.0, float(motion["duration"]) - float(motion["elapsed"]))
+			if remaining < time_left:
+				motion["elapsed"] = float(motion["elapsed"]) + remaining
+				break
+			remaining -= time_left
+			if queued.is_empty():
+				finished = true
+				break
+			motion = queued.pop_front()
+			motion["queue"] = queued
+		if finished:
+			movement_animations.erase(key)
+		else:
+			movement_animations[key] = motion
+	_advance_timed_animations(action_animations, delta)
+	_advance_timed_animations(impact_animations, delta)
+	_advance_timed_animations(spawn_animations, delta)
+	_advance_timed_animations(fall_animations, delta)
+	_advance_timed_animations(death_animations, delta)
+	for index in range(visual_effects.size() - 1, -1, -1):
+		var effect: Dictionary = visual_effects[index]
+		effect["elapsed"] = float(effect["elapsed"]) + delta
+		if float(effect["elapsed"]) >= float(effect["duration"]):
+			visual_effects.remove_at(index)
+		else:
+			visual_effects[index] = effect
+
+
+func _advance_timed_animations(animations: Dictionary, delta: float) -> void:
+	for key in animations.keys():
+		var state: Dictionary = animations[key]
+		state["elapsed"] = float(state["elapsed"]) + delta
+		if float(state["elapsed"]) >= float(state["duration"]):
+			animations.erase(key)
+		else:
+			animations[key] = state
