@@ -295,32 +295,95 @@ func _slot_available(hero, slot: int) -> bool:
 
 
 func _draw_action_slot(hero, top: float, slot: int) -> void:
-	var rect := _slot_rect(top, slot)
-	var available := _slot_available(hero, slot)
-	var edge := Color("d8ae64") if available else Color("77736d")
+	var rect: Rect2 = _slot_rect(top, slot)
+	var available: bool = _slot_available(hero, slot)
+	var edge: Color = Color("c6ab76") if available else Color("77736d")
 	draw_rect(rect, Color(0.09, 0.13, 0.17, 0.93) if available else Color(0.08, 0.08, 0.09, 0.86), true)
 	draw_rect(rect, edge, false, 2.0)
-	var symbol := ""
+	draw_rect(Rect2(rect.position + Vector2(3, 3), rect.size - Vector2(6, 6)), Color("4c5b63") if available else Color("36383a"), false, 1.0)
+	var center: Vector2 = rect.position + Vector2(22, 22)
 	match slot:
-		0: symbol = "УД"
-		1: symbol = "ЛУК"
+		0: _draw_swords_icon(center, available)
+		1: _draw_bow_icon(center, available)
 		2:
 			if hero.has_action("fire_arrow"):
-				symbol = "ОГ"
+				_draw_fire_icon(center, available)
 			elif hero.has_action("quick_heal"):
-				symbol = "ЛЕЧ"
+				_draw_heal_icon(center, available)
 			else:
-				symbol = "—"
-		3: symbol = "—"
-		4: symbol = "ЗД"
-		5: symbol = "МН"
-	var text_color := Color("f5e2ad") if available else Color("85888c")
-	_text(symbol, rect.position + Vector2(8, 29), 17 if symbol.length() <= 2 else 12, text_color)
+				_draw_empty_icon(center)
+		3: _draw_empty_icon(center)
+		4: _draw_potion_icon(center, Color("cc493e"), available)
+		5: _draw_potion_icon(center, Color("338fd0"), available)
 	draw_circle(rect.position + Vector2(39, 8), 9.0, Color("2d8dba") if available else Color("585e62"))
+	draw_arc(rect.position + Vector2(39, 8), 9.0, 0.0, TAU, 20, Color("e0c681") if available else Color("77736d"), 1.5, true)
 	_text(SLOT_KEYS[slot], rect.position + Vector2(34, 12), 11, Color.WHITE)
 	if slot == 4 or slot == 5:
 		var count: int = hero.health_potions if slot == 4 else hero.mana_potions
-		_text(str(count), rect.position + Vector2(35, 39), 12, text_color)
+		draw_circle(rect.position + Vector2(39, 36), 7.0, Color("182025"))
+		_text(str(count), rect.position + Vector2(36, 40), 11, Color.WHITE if available else Color("999999"))
+
+
+func _draw_swords_icon(center: Vector2, available: bool) -> void:
+	var steel: Color = Color("dce9e8") if available else Color("6b7172")
+	var gold: Color = Color("dbad63") if available else Color("68635a")
+	for side in [-1.0, 1.0]:
+		var hilt: Vector2 = center + Vector2(-10.0 * side, 10)
+		var tip: Vector2 = center + Vector2(11.0 * side, -11)
+		draw_line(hilt, tip, Color("283b42"), 6.0, true)
+		draw_line(hilt + Vector2(3.0 * side, -3), tip, steel, 3.0, true)
+		draw_line(hilt + Vector2(-3.0 * side, -3), hilt + Vector2(3.0 * side, 3), gold, 3.0, true)
+		draw_circle(hilt + Vector2(-2.0 * side, 2), 2.0, gold)
+
+
+func _draw_bow_icon(center: Vector2, available: bool) -> void:
+	var wood: Color = Color("c68f51") if available else Color("69645e")
+	var arrow: Color = Color("e6e4d2") if available else Color("737575")
+	draw_arc(center + Vector2(-5, 0), 14.0, -PI / 2.0, PI / 2.0, 20, wood, 4.0, true)
+	draw_line(center + Vector2(-5, -14), center + Vector2(-5, 14), arrow, 1.5, true)
+	draw_line(center + Vector2(-14, 0), center + Vector2(14, 0), arrow, 2.5, true)
+	draw_colored_polygon(PackedVector2Array([center + Vector2(15, 0), center + Vector2(8, -4), center + Vector2(8, 4)]), arrow)
+	draw_line(center + Vector2(-13, 0), center + Vector2(-17, -4), wood, 2.0, true)
+	draw_line(center + Vector2(-13, 0), center + Vector2(-17, 4), wood, 2.0, true)
+
+
+func _draw_fire_icon(center: Vector2, available: bool) -> void:
+	var flame: Color = Color("ee792e") if available else Color("6e6660")
+	var core: Color = Color("ffe49a") if available else Color("85817a")
+	draw_line(center + Vector2(-12, 11), center + Vector2(6, -7), Color("c8b99a") if available else core, 3.0, true)
+	draw_colored_polygon(PackedVector2Array([center + Vector2(2, -3), center + Vector2(8, -15), center + Vector2(10, -7), center + Vector2(15, -11), center + Vector2(14, 0), center + Vector2(7, 5)]), flame)
+	draw_colored_polygon(PackedVector2Array([center + Vector2(6, -2), center + Vector2(10, -8), center + Vector2(11, 0), center + Vector2(8, 2)]), core)
+
+
+func _draw_heal_icon(center: Vector2, available: bool) -> void:
+	var glow: Color = Color("72c987") if available else Color("686d69")
+	var light: Color = Color("e9f5d5") if available else Color("929792")
+	draw_circle(center, 13.0, Color("174638") if available else Color("303635"))
+	draw_arc(center, 13.0, 0.0, TAU, 24, glow, 2.0, true)
+	draw_rect(Rect2(center + Vector2(-3, -10), Vector2(6, 20)), light, true)
+	draw_rect(Rect2(center + Vector2(-10, -3), Vector2(20, 6)), light, true)
+	draw_circle(center, 2.5, glow)
+
+
+func _draw_empty_icon(center: Vector2) -> void:
+	draw_circle(center, 10.0, Color("252c30"))
+	draw_arc(center, 10.0, 0.0, TAU, 20, Color("50595b"), 2.0, true)
+
+
+func _draw_potion_icon(center: Vector2, liquid: Color, available: bool) -> void:
+	var outline: Color = Color("d9e4df") if available else Color("747a78")
+	var fill: Color = liquid if available else Color("565b5c")
+	draw_colored_polygon(PackedVector2Array([center + Vector2(-5, -10), center + Vector2(5, -10), center + Vector2(5, -5), center + Vector2(10, 4), center + Vector2(8, 12), center + Vector2(-8, 12), center + Vector2(-10, 4), center + Vector2(-5, -5)]), Color("243238"))
+	draw_colored_polygon(PackedVector2Array([center + Vector2(-8, 2), center + Vector2(8, 2), center + Vector2(7, 10), center + Vector2(-7, 10)]), fill)
+	draw_line(center + Vector2(-5, -10), center + Vector2(-5, -5), outline, 2.0, true)
+	draw_line(center + Vector2(-5, -5), center + Vector2(-10, 4), outline, 2.0, true)
+	draw_line(center + Vector2(-10, 4), center + Vector2(-8, 12), outline, 2.0, true)
+	draw_line(center + Vector2(-8, 12), center + Vector2(8, 12), outline, 2.0, true)
+	draw_line(center + Vector2(8, 12), center + Vector2(10, 4), outline, 2.0, true)
+	draw_line(center + Vector2(10, 4), center + Vector2(5, -5), outline, 2.0, true)
+	draw_line(center + Vector2(5, -5), center + Vector2(5, -10), outline, 2.0, true)
+	draw_rect(Rect2(center + Vector2(-6, -14), Vector2(12, 4)), Color("9b754c") if available else Color("585550"), true)
+	draw_line(center + Vector2(-5, 4), center + Vector2(-3, 8), Color(1, 1, 1, 0.7 if available else 0.25), 2.0, true)
 
 
 func _draw_journal_preview() -> void:
