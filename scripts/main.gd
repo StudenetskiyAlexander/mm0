@@ -12,6 +12,10 @@ const ARCHER_ANIMATION: Texture2D = preload("res://assets/archer-animation-sheet
 const SMALL_GOBLIN_ANIMATION: Texture2D = preload("res://assets/small-goblin-animation-sheet.png")
 const ARMORED_GOBLIN_ANIMATION: Texture2D = preload("res://assets/armored-goblin-animation-sheet.png")
 const WOLF_ANIMATION_SOURCE: Texture2D = preload("res://assets/wolf-animation-sheet.png")
+const WARRIOR_PORTRAITS: Texture2D = preload("res://assets/warrior-portrait-sheet.png")
+const MAGE_PORTRAITS: Texture2D = preload("res://assets/mage-portrait-sheet.png")
+const CLERIC_PORTRAITS: Texture2D = preload("res://assets/cleric-portrait-sheet.png")
+const ARCHER_PORTRAITS: Texture2D = preload("res://assets/archer-portrait-sheet.png")
 const CLERIC: Texture2D = preload("res://assets/human-cleric.png")
 const ARCHER: Texture2D = preload("res://assets/human-archer.png")
 const ARCHER_SPRITE: Texture2D = preload("res://assets/human-archer-sprite.png")
@@ -41,6 +45,7 @@ var impact_animations: Dictionary = {}
 var spawn_animations: Dictionary = {}
 var fall_animations: Dictionary = {}
 var death_animations: Dictionary = {}
+var portrait_reactions: Dictionary = {}
 var visual_effects: Array[Dictionary] = []
 var wolf_animation: Texture2D
 
@@ -490,7 +495,7 @@ func _draw_hero_panel() -> void:
 		var portrait := Rect2(14, top + 9, 192, 139)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
-		_draw_portrait(hero, portrait)
+		_draw_portrait(hero, portrait, index)
 		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(21, top + 141), 14, Color.WHITE)
 		_draw_resource_bar(Rect2(14, top + 155, 192, 17), hero.health, hero.max_health(), Color("d83834"))
 		_draw_resource_bar(Rect2(14, top + 178, 192, 17), hero.mana, hero.max_mana(), Color("3187dc"))
@@ -503,8 +508,19 @@ func _draw_hero_panel() -> void:
 			_text("Отдых %.1f c" % hero.cooldown, Vector2(228, top + 194), 12, Color("dfbd78"))
 
 
-func _draw_portrait(hero, rect: Rect2) -> void:
+func _draw_portrait(hero, rect: Rect2, index: int) -> void:
 	var inner := Rect2(rect.position + Vector2(5, 5), rect.size - Vector2(10, 10))
+	var sheet: Texture2D = _portrait_sheet(hero)
+	if sheet != null:
+		var frame: int = _portrait_frame(hero, index)
+		var frame_width: float = float(sheet.get_width()) / 4.0
+		var frame_height: float = float(sheet.get_height()) / 2.0
+		var crop_height: float = minf(frame_height, frame_width * inner.size.y / inner.size.x)
+		var crop_top: float = (frame_height - crop_height) * 0.18
+		var frame_row: int = floori(float(frame) / 4.0)
+		var source := Rect2(float(frame % 4) * frame_width, float(frame_row) * frame_height + crop_top, frame_width, crop_height)
+		draw_texture_rect_region(sheet, inner, source)
+		return
 	match hero.class_id():
 		"warrior":
 			draw_texture_rect_region(COMBATANTS, inner, Rect2(126, 50, 130, 126))
@@ -516,6 +532,38 @@ func _draw_portrait(hero, rect: Rect2) -> void:
 			draw_texture_rect_region(ARCHER, inner, Rect2(270, 60, 470, 435))
 	if not hero.conscious():
 		draw_rect(inner, Color(0.05, 0.05, 0.06, 0.55), true)
+
+
+func _portrait_sheet(hero) -> Texture2D:
+	match hero.class_id():
+		"warrior":
+			return WARRIOR_PORTRAITS
+		"mage":
+			return MAGE_PORTRAITS
+		"cleric":
+			return CLERIC_PORTRAITS
+		"archer":
+			return ARCHER_PORTRAITS
+	return null
+
+
+func _portrait_frame(hero, index: int) -> int:
+	var unit_id: int = hero.get_instance_id()
+	if portrait_reactions.has(unit_id):
+		var reaction: Dictionary = portrait_reactions[unit_id]
+		if float(reaction["elapsed"]) < 0.0:
+			return int(reaction.get("before", 0))
+		return int(reaction["frame"])
+	if not hero.alive():
+		return 7
+	if not hero.conscious():
+		return 6
+	var blink_phase: float = fposmod(animation_time + float(index) * 1.1, 4.1)
+	if blink_phase >= 3.85 and blink_phase < 3.95:
+		return 2
+	if blink_phase >= 3.77 and blink_phase < 4.03:
+		return 1
+	return 0
 
 
 func _draw_resource_bar(rect: Rect2, value: int, maximum: int, fill_color: Color) -> void:
@@ -859,6 +907,7 @@ func _clear_animations() -> void:
 	spawn_animations.clear()
 	fall_animations.clear()
 	death_animations.clear()
+	portrait_reactions.clear()
 	visual_effects.clear()
 
 
@@ -890,6 +939,9 @@ func _on_visual_event(event: Dictionary) -> void:
 	elif kind == "quick_heal":
 		action_duration = 0.52
 	action_animations[unit_id] = {"kind": kind, "direction": direction, "elapsed": 0.0, "duration": action_duration}
+	if unit.is_hero:
+		var action_frame: int = 5 if (kind == "health_potion" or kind == "mana_potion") and int(event.get("amount", 0)) > 0 else 3
+		portrait_reactions[unit_id] = {"frame": action_frame, "elapsed": 0.0, "duration": action_duration + 0.14}
 	match kind:
 		"melee":
 			if target != null:
@@ -908,6 +960,8 @@ func _on_visual_event(event: Dictionary) -> void:
 			var recovered: int = int(event.get("amount", 0))
 			if recovered > 0:
 				visual_effects.append({"kind": "text", "position": heal_position, "label": "+%d" % recovered, "color": Color("a9f2ba"), "elapsed": -0.25, "duration": 0.7})
+				if target != null and target.is_hero:
+					portrait_reactions[target.get_instance_id()] = {"frame": 5, "before": 6 if bool(event.get("revived", false)) else 0, "elapsed": -0.25, "duration": 0.75}
 			if target != null and bool(event.get("revived", false)):
 				var target_id: int = target.get_instance_id()
 				fall_animations.erase(target_id)
@@ -947,6 +1001,8 @@ func _schedule_impact(event: Dictionary, target, delay: float) -> void:
 	var position: Vector2 = _unit_position(target)
 	if bool(event.get("hit", false)):
 		impact_animations[target_id] = {"elapsed": -delay, "duration": 0.32}
+		if target.is_hero:
+			portrait_reactions[target_id] = {"frame": 4, "before": 0, "elapsed": -delay, "duration": 0.55}
 		visual_effects.append({"kind": "burst", "position": position, "elapsed": -delay, "duration": 0.27})
 		var damage: int = int(event.get("damage", 0))
 		if damage > 0:
@@ -987,6 +1043,7 @@ func _advance_animations(delta: float) -> void:
 	_advance_timed_animations(spawn_animations, delta)
 	_advance_timed_animations(fall_animations, delta)
 	_advance_timed_animations(death_animations, delta)
+	_advance_timed_animations(portrait_reactions, delta)
 	for index in range(visual_effects.size() - 1, -1, -1):
 		var effect: Dictionary = visual_effects[index]
 		effect["elapsed"] = float(effect["elapsed"]) + delta
