@@ -23,21 +23,22 @@ var music_player: AudioStreamPlayer
 var active_players: Array[AudioStreamPlayer] = []
 var queued_sounds: Array[Dictionary] = []
 var paused := false
+var music_enabled := false
 var step_cooldown := 0.0
 
 
 func _ready() -> void:
 	music_player = AudioStreamPlayer.new()
-	var loop_stream: AudioStreamWAV = BATTLE_THEME.duplicate() as AudioStreamWAV
-	loop_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	music_player.stream = loop_stream
-	music_player.volume_db = -16.0
+	music_player.stream = BATTLE_THEME
+	music_player.volume_db = -4.0
 	add_child(music_player)
 
 
 func _process(delta: float) -> void:
 	if paused:
 		return
+	if music_enabled and not music_player.playing:
+		music_player.play()
 	step_cooldown = maxf(0.0, step_cooldown - delta)
 	for index in range(queued_sounds.size() - 1, -1, -1):
 		var sound: Dictionary = queued_sounds[index]
@@ -51,17 +52,20 @@ func _process(delta: float) -> void:
 
 func start_battle() -> void:
 	stop_battle()
+	music_enabled = true
 	paused = false
 	music_player.stream_paused = false
 	music_player.play()
 
 
 func finish_battle() -> void:
+	music_enabled = false
 	music_player.stop()
 	# Let the final hit and fall finish even though the battle state has ended.
 
 
 func stop_battle() -> void:
+	music_enabled = false
 	music_player.stop()
 	queued_sounds.clear()
 	step_cooldown = 0.0
