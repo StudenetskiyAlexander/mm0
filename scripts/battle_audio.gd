@@ -11,7 +11,6 @@ const SOUNDS := {
 	"fire_hit": preload("res://assets/audio/fire_hit.wav"),
 	"heal": preload("res://assets/audio/heal.wav"),
 	"potion": preload("res://assets/audio/potion.wav"),
-	"spawn": preload("res://assets/audio/spawn.wav"),
 	"fall": preload("res://assets/audio/fall.wav"),
 	"step": preload("res://assets/audio/step.wav"),
 	"bite": preload("res://assets/audio/bite.wav"),
@@ -90,7 +89,6 @@ func handle_visual_event(event: Dictionary) -> void:
 			step_cooldown = 0.18
 		return
 	if kind == "spawn":
-		_schedule("spawn", 0.0, -11.0)
 		return
 	var target = event.get("target", null)
 	var unit = event.get("unit", null)

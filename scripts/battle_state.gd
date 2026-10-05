@@ -204,10 +204,11 @@ func _update_enemy(enemy, delta: float) -> void:
 
 func _spawn_enemy() -> bool:
 	var free_cells: Array[Vector2i] = []
-	for row in range(BOARD.ROWS):
-		var cell := Vector2i(BOARD.COLUMNS - 1, row)
-		if not _occupied(cell):
-			free_cells.append(cell)
+	for column in range(BOARD.COLUMNS - 3, BOARD.COLUMNS):
+		for row in range(BOARD.ROWS):
+			var cell := Vector2i(column, row)
+			if not _occupied(cell):
+				free_cells.append(cell)
 	if free_cells.is_empty():
 		return false
 	var cell := free_cells[rng.randi_range(0, free_cells.size() - 1)]
