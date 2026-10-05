@@ -124,7 +124,10 @@ func perform_action(index: int, action_id: String) -> bool:
 		else:
 			_physical_attack(hero, target, false)
 	elif action_id == "shoot":
-		var target = _nearest_enemy(hero.cell, 2, 4)
+		if not can_shoot(hero):
+			return false
+		var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_hexes", 2))
+		var target = _nearest_enemy(hero.cell, minimum_range, -1)
 		if target == null:
 			_log("%s выпускает стрелу, но подходящей цели нет." % hero.name())
 			visual_event.emit({"kind": "shoot", "unit": hero, "target": null, "hit": false, "damage": 0})
@@ -246,7 +249,7 @@ func _nearest_enemy(from_cell: Vector2i, minimum_range: int, maximum_range: int)
 		if not enemy.conscious():
 			continue
 		var distance: int = BOARD.distance(from_cell, enemy.cell)
-		if distance < minimum_range or distance > maximum_range:
+		if distance < minimum_range or (maximum_range >= 0 and distance > maximum_range):
 			continue
 		if distance < best_distance:
 			best_distance = distance
@@ -256,6 +259,14 @@ func _nearest_enemy(from_cell: Vector2i, minimum_range: int, maximum_range: int)
 	if closest.is_empty():
 		return null
 	return closest[rng.randi_range(0, closest.size() - 1)]
+
+
+func can_shoot(hero) -> bool:
+	var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_hexes", 2))
+	for enemy in enemies:
+		if enemy.conscious() and BOARD.distance(hero.cell, enemy.cell) < minimum_range:
+			return false
+	return true
 
 
 func _lowest_health_hero():
@@ -282,8 +293,10 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var skill_name := str(weapon.get("skill_id", ""))
 	var skill_value: int = attacker.skill(skill_name)
 	var weapon_bonus := int(weapon.get("accuracy_bonus", 0))
+	var distance: int = BOARD.distance(attacker.cell, target.cell)
+	var range_penalty: int = maxi(0, distance - 5) * 3 if ranged else 0
 	var die := rng.randi_range(1, 20)
-	var attack_total := attribute_value + skill_value + weapon_bonus + die
+	var attack_total := attribute_value + skill_value + weapon_bonus + die - range_penalty
 	var armor_value: Variant = target.profile.get("armor", null)
 	var armor_name := "нет"
 	var armor_skill := 0
@@ -304,6 +317,9 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	if weapon_bonus != 0:
 		attack_parts.append("оружие %d" % weapon_bonus)
 	attack_parts.append("1д20 (%d)" % die)
+	var attack_expression: String = " + ".join(attack_parts)
+	if range_penalty > 0:
+		attack_expression += " − штраф дальности %d (%d клет. сверх 5)" % [range_penalty, distance - 5]
 	var defense_parts := PackedStringArray(["10"])
 	if target_dexterity != 0:
 		defense_parts.append("Ловкость %d" % target_dexterity)
@@ -311,7 +327,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		defense_parts.append("%s %d" % [armor_name, armor_skill])
 	if equipment_bonus != 0:
 		defense_parts.append("снаряжение %d" % equipment_bonus)
-	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), " + ".join(attack_parts), attack_total, " + ".join(defense_parts), defense_total]
+	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), attack_expression, attack_total, " + ".join(defense_parts), defense_total]
 	if hit:
 		var damage_dice := str(weapon.get("damage_dice", "1d4"))
 		var die_damage := _roll_dice(damage_dice)

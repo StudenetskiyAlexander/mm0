@@ -613,6 +613,8 @@ func _slot_available(hero, slot: int) -> bool:
 	var action_id := _slot_action_id(hero, slot)
 	if action_id == "" or not hero.has_action(action_id):
 		return false
+	if action_id == "shoot":
+		return battle.can_shoot(hero)
 	if action_id == "fire_arrow" or action_id == "quick_heal":
 		return hero.mana >= 5
 	return true
