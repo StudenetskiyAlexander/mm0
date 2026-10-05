@@ -7,6 +7,7 @@ signal visual_event(event: Dictionary)
 const BOARD = preload("res://scripts/hex_board.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
 const ACTION_COOLDOWN := 3.0
+const PROJECTILE_LAUNCH_DELAY := 0.32
 
 var heroes: Array = []
 var enemies: Array = []
@@ -16,6 +17,7 @@ var selected_hero := -1
 var spawn_clock := 0.0
 var elapsed := 0.0
 var defeated_enemies := 0
+var pending_projectiles: Array[Dictionary] = []
 var ended := false
 var won := false
 var rng := RandomNumberGenerator.new()
@@ -33,6 +35,7 @@ func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]
 	spawn_clock = 0.0
 	elapsed = 0.0
 	defeated_enemies = 0
+	pending_projectiles.clear()
 	ended = false
 	for index in range(hero_profiles.size()):
 		var unit = COMBATANT.new()
@@ -47,6 +50,7 @@ func tick(delta: float) -> void:
 	if ended:
 		return
 	elapsed += delta
+	_advance_projectiles(delta)
 	for hero in heroes:
 		hero.cooldown = maxf(0.0, hero.cooldown - delta)
 	for enemy in enemies:
@@ -143,9 +147,8 @@ func perform_action(index: int, action_id: String) -> bool:
 			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": null, "hit": false, "damage": 0})
 		else:
 			var damage := _roll_dice("1d8")
-			_log("%s применяет Огненную стрелу к %s: 1д8 = %d урона." % [hero.name(), target.name(), damage])
-			_apply_damage(hero, target, damage)
-			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": target, "hit": true, "damage": damage})
+			var result := "%s применяет Огненную стрелу к %s: 1д8 = %d урона." % [hero.name(), target.name(), damage]
+			_launch_projectile(hero, target, "fire_arrow", true, damage, result)
 	elif action_id == "quick_heal":
 		if hero.mana < 5:
 			return false
@@ -341,11 +344,48 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		var damage_details: String = "Урон: %d" % damage
 		if not damage_parts.is_empty():
 			damage_details = "Урон: %s = %d" % [" + ".join(damage_parts), damage]
-		_log(details + " Попадание. %s." % damage_details)
-		_apply_damage(attacker, target, damage)
+		if ranged:
+			_launch_projectile(attacker, target, "shoot", true, damage, details + " Попадание. %s." % damage_details)
+		else:
+			_log(details + " Попадание. %s." % damage_details)
+			_apply_damage(attacker, target, damage)
 	else:
-		_log(details + " Промах.")
-	visual_event.emit({"kind": "shoot" if ranged else "melee", "unit": attacker, "target": target, "hit": hit, "damage": damage})
+		if ranged:
+			_launch_projectile(attacker, target, "shoot", false, 0, details + " Промах.")
+		else:
+			_log(details + " Промах.")
+	if not ranged:
+		visual_event.emit({"kind": "melee", "unit": attacker, "target": target, "hit": hit, "damage": damage})
+
+
+func _launch_projectile(attacker, target, kind: String, hit: bool, damage: int, result: String) -> void:
+	var origin: Vector2 = BOARD.center(attacker.cell)
+	var destination: Vector2 = BOARD.center(target.cell)
+	var speed := 650.0 if kind == "shoot" else 570.0
+	var travel_time: float = clampf(origin.distance_to(destination) / speed, 0.2, 0.72)
+	var impact_delay: float = PROJECTILE_LAUNCH_DELAY + travel_time
+	pending_projectiles.append({"remaining": impact_delay, "unit": attacker, "target": target, "kind": kind, "hit": hit, "damage": damage, "result": result})
+	visual_event.emit({"kind": kind, "unit": attacker, "target": target, "launch_delay": PROJECTILE_LAUNCH_DELAY, "travel_time": travel_time, "impact_delay": impact_delay})
+
+
+func _advance_projectiles(delta: float) -> void:
+	for index in range(pending_projectiles.size() - 1, -1, -1):
+		var projectile: Dictionary = pending_projectiles[index]
+		projectile["remaining"] = float(projectile["remaining"]) - delta
+		if float(projectile["remaining"]) > 0.0:
+			pending_projectiles[index] = projectile
+			continue
+		pending_projectiles.remove_at(index)
+		var attacker = projectile["unit"]
+		var target = projectile["target"]
+		var hit: bool = bool(projectile["hit"]) and target.conscious()
+		if target.conscious():
+			_log(str(projectile["result"]))
+			if hit:
+				_apply_damage(attacker, target, int(projectile["damage"]))
+		else:
+			_log("%s: цель уже повержена к моменту попадания." % attacker.name())
+		visual_event.emit({"kind": "projectile_impact", "projectile_kind": projectile["kind"], "unit": attacker, "target": target, "hit": hit, "damage": int(projectile["damage"]) if hit else 0})
 
 
 func _apply_damage(_attacker, target, amount: int) -> void:
@@ -427,6 +467,8 @@ func _check_end() -> void:
 		battle_ended.emit(false)
 		return
 	if enemies_remaining_to_spawn > 0:
+		return
+	if not pending_projectiles.is_empty():
 		return
 	for enemy in enemies:
 		if enemy.conscious():

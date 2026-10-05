@@ -94,6 +94,9 @@ func handle_visual_event(event: Dictionary) -> void:
 		return
 	var target = event.get("target", null)
 	var unit = event.get("unit", null)
+	if kind == "projectile_impact":
+		_schedule_impact(event, target, 0.0, str(event.get("projectile_kind", "")) == "fire_arrow")
+		return
 	match kind:
 		"melee":
 			var swing := "sword_swing"
@@ -105,7 +108,7 @@ func handle_visual_event(event: Dictionary) -> void:
 			_schedule(swing, 0.0, -7.0)
 			_schedule_impact(event, target, 0.22, false)
 		"shoot", "fire_arrow":
-			var launch_delay := 0.32
+			var launch_delay: float = float(event.get("launch_delay", 0.32))
 			if unit == null:
 				return
 			var origin: Vector2 = BOARD.center(unit.cell)
@@ -113,9 +116,10 @@ func handle_visual_event(event: Dictionary) -> void:
 			if target != null:
 				destination = BOARD.center(target.cell)
 			var speed := 650.0 if kind == "shoot" else 570.0
-			var travel_time: float = clampf(origin.distance_to(destination) / speed, 0.2, 0.72)
+			var travel_time: float = float(event.get("travel_time", clampf(origin.distance_to(destination) / speed, 0.2, 0.72)))
 			_schedule("bow" if kind == "shoot" else "fire_cast", launch_delay, -7.0)
-			_schedule_impact(event, target, launch_delay + travel_time, kind == "fire_arrow")
+			if target == null:
+				_schedule_impact(event, target, launch_delay + travel_time, kind == "fire_arrow")
 		"quick_heal":
 			_schedule("heal", 0.24, -5.0)
 		"health_potion", "mana_potion":

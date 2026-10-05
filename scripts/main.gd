@@ -468,6 +468,9 @@ func _draw_visual_effects() -> void:
 func _draw_projectile(effect: Dictionary, progress: float) -> void:
 	var start: Vector2 = effect["start"]
 	var finish: Vector2 = effect["end"]
+	var target = effect.get("target", null)
+	if target != null and target.conscious():
+		finish = _unit_position(target)
 	var position: Vector2 = start.lerp(finish, progress)
 	var direction: Vector2 = (finish - start).normalized()
 	if direction == Vector2.ZERO:
@@ -935,6 +938,9 @@ func _on_visual_event(event: Dictionary) -> void:
 	if kind == "move":
 		_queue_movement(event)
 		return
+	if kind == "projectile_impact":
+		_schedule_impact(event, event["target"], 0.0)
+		return
 	var origin: Vector2 = _unit_position(unit)
 	if kind == "spawn":
 		spawn_animations[unit_id] = {"elapsed": 0.0, "duration": 0.32}
@@ -964,11 +970,9 @@ func _on_visual_event(event: Dictionary) -> void:
 				visual_effects.append({"kind": "slash", "position": destination, "direction": direction, "elapsed": -impact_delay, "duration": 0.25})
 				_schedule_impact(event, target, impact_delay)
 		"shoot", "fire_arrow":
-			var launch_delay: float = 0.32
-			var travel_time: float = clampf(origin.distance_to(destination) / (650.0 if kind == "shoot" else 570.0), 0.2, 0.72)
-			visual_effects.append({"kind": "arrow" if kind == "shoot" else "fire", "start": origin, "end": destination, "elapsed": -launch_delay, "duration": travel_time})
-			if target != null:
-				_schedule_impact(event, target, launch_delay + travel_time)
+			var launch_delay: float = float(event.get("launch_delay", 0.32))
+			var travel_time: float = float(event.get("travel_time", clampf(origin.distance_to(destination) / (650.0 if kind == "shoot" else 570.0), 0.2, 0.72)))
+			visual_effects.append({"kind": "arrow" if kind == "shoot" else "fire", "start": origin, "end": destination, "target": target, "elapsed": -launch_delay, "duration": travel_time})
 		"quick_heal":
 			var heal_position: Vector2 = destination if target != null else origin
 			visual_effects.append({"kind": "pulse", "position": heal_position, "color": Color("80e6aa"), "elapsed": -0.25, "duration": 0.55})
