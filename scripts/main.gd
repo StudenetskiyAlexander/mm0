@@ -3,6 +3,7 @@ extends Control
 const BOARD = preload("res://scripts/hex_board.gd")
 const CATALOG = preload("res://scripts/data_catalog.gd")
 const BATTLE = preload("res://scripts/battle_state.gd")
+const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-sheet.png")
@@ -48,16 +49,21 @@ var death_animations: Dictionary = {}
 var portrait_reactions: Dictionary = {}
 var visual_effects: Array[Dictionary] = []
 var wolf_animation: Texture2D
+var battle_audio
 
 
 func _ready() -> void:
 	font = get_theme_default_font()
 	wolf_animation = _prepare_wolf_animation()
+	battle_audio = BATTLE_AUDIO.new()
+	add_child(battle_audio)
 	catalog.load_all()
 	battle.event_logged.connect(_on_battle_event)
 	battle.battle_ended.connect(_on_battle_end)
 	battle.visual_event.connect(_on_visual_event)
+	battle.visual_event.connect(battle_audio.handle_visual_event)
 	_build_log_panel()
+	log_panel.visibility_changed.connect(_sync_audio_pause)
 	_build_setup_overlay()
 	queue_redraw()
 
@@ -874,14 +880,20 @@ func _begin_battle() -> void:
 	_clear_animations()
 	setup_notice.text = ""
 	setup_overlay.hide()
+	battle_audio.start_battle()
 	battle.start(chosen_heroes, chosen_enemies)
 	queue_redraw()
 
 
 func _show_setup() -> void:
+	battle_audio.stop_battle()
 	log_panel.hide()
 	setup_overlay.show()
 	queue_redraw()
+
+
+func _sync_audio_pause() -> void:
+	battle_audio.set_audio_paused(log_panel.visible)
 
 
 func _on_battle_event(message: String) -> void:
@@ -896,6 +908,7 @@ func _on_battle_event(message: String) -> void:
 
 
 func _on_battle_end(_victory: bool) -> void:
+	battle_audio.finish_battle()
 	queue_redraw()
 
 

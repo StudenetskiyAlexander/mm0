@@ -5,3 +5,4 @@ outputs/*.png
 outputs/*.svg
 !outputs/battle-screen-vertical-party-v2.png
 outputs/*.zip
+outputs/*.wav
