@@ -6,16 +6,20 @@ signal visual_event(event: Dictionary)
 
 const BOARD = preload("res://scripts/hex_board.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
-const ACTION_COOLDOWN := 3.0
 const PROJECTILE_LAUNCH_DELAY := 0.32
+const ACTION_ANIMATION_TIME := 0.55
+const ENEMY_MOVE_CELLS_PER_TURN := 3
 
 var heroes: Array = []
 var enemies: Array = []
 var enemy_queue: Array[Dictionary] = []
 var enemies_remaining_to_spawn := 0
 var selected_hero := -1
-var spawn_clock := 0.0
-var elapsed := 0.0
+var phase := "heroes"
+var round_number := 0
+var hero_turn_cursor := 0
+var enemy_turn_cursor := 0
+var turn_delay := 0.0
 var defeated_enemies := 0
 var pending_projectiles: Array[Dictionary] = []
 var ended := false
@@ -32,8 +36,11 @@ func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]
 	for entry in enemy_queue:
 		enemies_remaining_to_spawn += int(entry.get("count", 0))
 	selected_hero = -1
-	spawn_clock = 0.0
-	elapsed = 0.0
+	phase = "heroes"
+	round_number = 0
+	hero_turn_cursor = 0
+	enemy_turn_cursor = 0
+	turn_delay = 0.0
 	defeated_enemies = 0
 	pending_projectiles.clear()
 	ended = false
@@ -41,51 +48,79 @@ func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]
 		var unit = COMBATANT.new()
 		unit.initialize(hero_profiles[index], true, Vector2i(0, BOARD.HERO_ROWS[index]))
 		heroes.append(unit)
-	select_next_active(-1)
 	_log("Бой начался. Герои: %d; враги в очереди: %d." % [heroes.size(), enemies_remaining_to_spawn])
+	_begin_round()
 	_check_end()
 
 
 func tick(delta: float) -> void:
 	if ended:
 		return
-	elapsed += delta
 	_advance_projectiles(delta)
-	for hero in heroes:
-		hero.cooldown = maxf(0.0, hero.cooldown - delta)
-	for enemy in enemies:
-		enemy.cooldown = maxf(0.0, enemy.cooldown - delta)
-	if selected_hero < 0 or selected_hero >= heroes.size() or not heroes[selected_hero].ready():
-		select_next_active(selected_hero)
-	for enemy in enemies:
-		if enemy.conscious():
-			_update_enemy(enemy, delta)
-	spawn_clock += delta
-	while spawn_clock >= 1.0 and enemies_remaining_to_spawn > 0:
-		if _spawn_enemy():
-			spawn_clock -= 1.0
-		else:
-			spawn_clock = 1.0
-			break
+	_check_end()
+	if ended:
+		return
+	turn_delay = maxf(0.0, turn_delay - delta)
+	if turn_delay > 0.0:
+		return
+	if phase == "heroes":
+		if selected_hero < 0:
+			_advance_hero_turn()
+	else:
+		_take_next_enemy_turn()
 	_check_end()
 
 
 func select_hero(index: int) -> bool:
-	if ended or index < 0 or index >= heroes.size() or not heroes[index].ready():
-		return false
-	selected_hero = index
-	return true
+	return can_hero_act(index)
 
 
-func select_next_active(after_index: int) -> void:
-	selected_hero = -1
-	if heroes.is_empty():
+func can_hero_act(index: int) -> bool:
+	return not ended and phase == "heroes" and turn_delay <= 0.0 and index == selected_hero and index >= 0 and index < heroes.size() and heroes[index].conscious()
+
+
+func skip_current_hero() -> void:
+	if not can_hero_act(selected_hero):
 		return
-	for offset in range(1, heroes.size() + 1):
-		var index := (after_index + offset + heroes.size()) % heroes.size()
-		if heroes[index].ready():
+	_log("%s пропускает ход." % heroes[selected_hero].name())
+	hero_turn_cursor = selected_hero + 1
+	selected_hero = -1
+	_advance_hero_turn()
+
+
+func _begin_round() -> void:
+	round_number += 1
+	phase = "heroes"
+	hero_turn_cursor = 0
+	enemy_turn_cursor = 0
+	selected_hero = -1
+	_log("Раунд %d: ход героев." % round_number)
+	if enemies_remaining_to_spawn > 0:
+		_spawn_enemy()
+	_advance_hero_turn()
+
+
+func _advance_hero_turn() -> void:
+	while hero_turn_cursor < heroes.size():
+		var index := hero_turn_cursor
+		hero_turn_cursor += 1
+		if heroes[index].conscious():
 			selected_hero = index
 			return
+	selected_hero = -1
+	phase = "enemies"
+	enemy_turn_cursor = 0
+	_log("Раунд %d: ход врагов." % round_number)
+
+
+func _take_next_enemy_turn() -> void:
+	while enemy_turn_cursor < enemies.size():
+		var enemy = enemies[enemy_turn_cursor]
+		enemy_turn_cursor += 1
+		if enemy.conscious():
+			_update_enemy(enemy)
+			return
+	_begin_round()
 
 
 func perform_selected(action_id: String) -> bool:
@@ -93,11 +128,9 @@ func perform_selected(action_id: String) -> bool:
 
 
 func perform_action(index: int, action_id: String) -> bool:
-	if ended or index < 0 or index >= heroes.size():
+	if not can_hero_act(index):
 		return false
 	var hero = heroes[index]
-	if not hero.ready():
-		return false
 	if action_id == "health_potion":
 		if hero.health_potions <= 0:
 			return false
@@ -135,6 +168,7 @@ func perform_action(index: int, action_id: String) -> bool:
 		if target == null:
 			_log("%s выпускает стрелу, но подходящей цели нет." % hero.name())
 			visual_event.emit({"kind": "shoot", "unit": hero, "target": null, "hit": false, "damage": 0})
+			turn_delay = _empty_projectile_delay("shoot")
 		else:
 			_physical_attack(hero, target, true)
 	elif action_id == "fire_arrow":
@@ -145,6 +179,7 @@ func perform_action(index: int, action_id: String) -> bool:
 		if target == null:
 			_log("%s выпускает Огненную стрелу без цели." % hero.name())
 			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": null, "hit": false, "damage": 0})
+			turn_delay = _empty_projectile_delay("fire_arrow")
 		else:
 			var damage := _roll_dice("1d8")
 			var result := "%s применяет Огненную стрелу к %s: 1д8 = %d урона." % [hero.name(), target.name(), damage]
@@ -167,39 +202,36 @@ func perform_action(index: int, action_id: String) -> bool:
 			visual_event.emit({"kind": "quick_heal", "unit": hero, "target": target, "amount": recovered, "revived": was_unconscious and target.conscious()})
 	else:
 		return false
-	hero.cooldown = ACTION_COOLDOWN
-	select_next_active(index)
+	turn_delay = maxf(turn_delay, ACTION_ANIMATION_TIME)
+	hero_turn_cursor = index + 1
+	selected_hero = -1
 	_check_end()
 	return true
 
 
-func _update_enemy(enemy, delta: float) -> void:
+func _update_enemy(enemy) -> void:
 	var target = _nearest_hero(enemy.cell)
 	if target == null:
 		return
 	var weapon: Dictionary = enemy.weapon()
 	var attack_range := int(weapon.get("attack_range_hexes", 1))
 	if BOARD.distance(enemy.cell, target.cell) <= attack_range:
-		enemy.movement_progress = 0.0
-		if enemy.cooldown <= 0.0:
-			_physical_attack(enemy, target, false)
-			enemy.cooldown = ACTION_COOLDOWN
+		_physical_attack(enemy, target, false)
+		turn_delay = ACTION_ANIMATION_TIME
 		return
-	var speed := float(enemy.profile.get("movement_speed_hexes_per_second", 1.0))
-	enemy.movement_progress += delta * speed
 	var steps := 0
-	while enemy.movement_progress >= 1.0 and steps < 3:
+	while steps < ENEMY_MOVE_CELLS_PER_TURN:
 		var next_cell := _next_step(enemy.cell, target.cell, attack_range)
 		if next_cell.x < 0:
-			enemy.movement_progress = 1.0
-			return
-		visual_event.emit({"kind": "move", "unit": enemy, "from_cell": enemy.cell, "to_cell": next_cell, "speed": speed})
+			break
+		visual_event.emit({"kind": "move", "unit": enemy, "from_cell": enemy.cell, "to_cell": next_cell, "speed": float(ENEMY_MOVE_CELLS_PER_TURN)})
 		enemy.cell = next_cell
-		enemy.movement_progress -= 1.0
 		steps += 1
 		if BOARD.distance(enemy.cell, target.cell) <= attack_range:
-			enemy.movement_progress = 0.0
-			return
+			break
+	if steps > 0:
+		_log("%s перемещается на %d клет." % [enemy.name(), steps])
+	turn_delay = maxf(0.16, 0.95 * float(steps) / float(ENEMY_MOVE_CELLS_PER_TURN))
 
 
 func _spawn_enemy() -> bool:
@@ -365,8 +397,14 @@ func _launch_projectile(attacker, target, kind: String, hit: bool, damage: int, 
 	var speed := 650.0 if kind == "shoot" else 570.0
 	var travel_time: float = clampf(origin.distance_to(destination) / speed, 0.2, 0.72)
 	var impact_delay: float = PROJECTILE_LAUNCH_DELAY + travel_time
+	turn_delay = maxf(turn_delay, impact_delay)
 	pending_projectiles.append({"remaining": impact_delay, "unit": attacker, "target": target, "kind": kind, "hit": hit, "damage": damage, "result": result})
 	visual_event.emit({"kind": kind, "unit": attacker, "target": target, "launch_delay": PROJECTILE_LAUNCH_DELAY, "travel_time": travel_time, "impact_delay": impact_delay})
+
+
+func _empty_projectile_delay(kind: String) -> float:
+	var speed := 650.0 if kind == "shoot" else 570.0
+	return PROJECTILE_LAUNCH_DELAY + clampf(260.0 / speed, 0.2, 0.72)
 
 
 func _advance_projectiles(delta: float) -> void:

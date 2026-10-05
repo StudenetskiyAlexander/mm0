@@ -5,8 +5,6 @@ var is_hero := false
 var cell := Vector2i.ZERO
 var health := 0
 var mana := 0
-var cooldown := 0.0
-var movement_progress := 0.0
 var health_potions := 0
 var mana_potions := 0
 
@@ -78,10 +76,6 @@ func alive() -> bool:
 
 func conscious() -> bool:
 	return health > 0
-
-
-func ready() -> bool:
-	return conscious() and cooldown <= 0.0
 
 
 func restore_health(amount: int) -> int:

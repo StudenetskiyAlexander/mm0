@@ -101,7 +101,7 @@ func _handle_key(event: InputEventKey) -> void:
 	if key >= KEY_1 and key <= KEY_4:
 		battle.select_hero(key - KEY_1)
 	elif key == KEY_SPACE:
-		battle.select_next_active(battle.selected_hero)
+		battle.skip_current_hero()
 	elif key == KEY_Q:
 		battle.perform_selected("melee_attack")
 	elif key == KEY_W:
@@ -163,7 +163,8 @@ func _draw_top_status() -> void:
 	draw_rect(Rect2(1280, 12, 296, 69), Color(0.04, 0.05, 0.06, 0.82), true)
 	draw_rect(Rect2(1280, 12, 296, 69), Color("b89b63"), false, 2.0)
 	_text("ВРАГИ: %d / %d" % [battle.defeated_enemies, battle.defeated_enemies + battle.enemies_remaining_to_spawn + _living_enemy_count()], Vector2(1295, 42), 20, Color("f2e1ae"))
-	_text("ВРЕМЯ: %.0f c" % battle.elapsed, Vector2(1295, 67), 15, Color("d6d8d2"))
+	var phase_label := "ГЕРОИ" if battle.phase == "heroes" else "ВРАГИ"
+	_text("РАУНД %d · %s" % [battle.round_number, phase_label], Vector2(1295, 67), 15, Color("d6d8d2"))
 
 
 func _living_enemy_count() -> int:
@@ -189,14 +190,13 @@ func _draw_units() -> void:
 	for enemy in battle.enemies:
 		var enemy_id: int = enemy.get_instance_id()
 		if enemy.conscious() or death_animations.has(enemy_id):
-			if enemy.conscious():
+			if enemy.conscious() and not movement_animations.has(enemy_id):
 				_draw_cell_frame(enemy.cell, Color(0.92, 0.50, 0.24, 0.88), false)
 			_draw_animated_unit(enemy)
 	for index in range(battle.heroes.size()):
 		var hero = battle.heroes[index]
-		var active: bool = hero.ready()
-		var selected: bool = battle.selected_hero == index and active
-		var color := Color("f9d45c") if selected else (Color("43db80") if active else Color("92999d"))
+		var selected: bool = battle.can_hero_act(index)
+		var color := Color("f9d45c") if selected else Color("92999d")
 		_draw_cell_frame(hero.cell, color, selected)
 		_draw_animated_unit(hero)
 
@@ -499,8 +499,8 @@ func _draw_hero_panel() -> void:
 			_text("Пустая ячейка", Vector2(88, top + 108), 18, Color("8b8c86"))
 			continue
 		var hero = battle.heroes[index]
-		var selected: bool = battle.selected_hero == index and hero.ready()
-		var edge := Color("f6cf62") if selected else (Color("3dbe74") if hero.ready() else Color("717b7d"))
+		var selected: bool = battle.can_hero_act(index)
+		var edge := Color("f6cf62") if selected else Color("717b7d")
 		var portrait := Rect2(14, top + 9, 192, 139)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
@@ -513,8 +513,8 @@ func _draw_hero_panel() -> void:
 		if not hero.conscious():
 			var status := "МЁРТВ" if not hero.alive() else "БЕЗ СОЗНАНИЯ"
 			_text(status, Vector2(27, top + 78), 16, Color("f48a85"))
-		elif hero.cooldown > 0.0:
-			_text("Отдых %.1f c" % hero.cooldown, Vector2(228, top + 194), 12, Color("dfbd78"))
+		elif selected:
+			_text("ВАШ ХОД", Vector2(228, top + 194), 12, Color("dfbd78"))
 
 
 func _draw_portrait(hero, rect: Rect2, index: int) -> void:
@@ -607,7 +607,7 @@ func _spell_for(hero) -> String:
 
 
 func _slot_available(hero, slot: int) -> bool:
-	if not hero.ready():
+	if not battle.can_hero_act(battle.heroes.find(hero)):
 		return false
 	if slot == 4:
 		return hero.health_potions > 0
@@ -902,7 +902,8 @@ func _sync_audio_pause() -> void:
 
 
 func _on_battle_event(message: String) -> void:
-	combat_log.append("[%05.1f] %s" % [battle.elapsed, message])
+	var prefix := "[Бой]" if battle.round_number == 0 else "[Раунд %d]" % battle.round_number
+	combat_log.append("%s %s" % [prefix, message])
 	if combat_log.size() > 500:
 		combat_log.pop_front()
 	var full_text := ""
