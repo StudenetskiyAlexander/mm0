@@ -137,13 +137,13 @@ func perform_action(index: int, action_id: String) -> bool:
 		if hero.mana < 5:
 			return false
 		hero.mana -= 5
-		var target = _nearest_enemy(hero.cell, 1, 6)
+		var target = _nearest_enemy(hero.cell, 1, -1)
 		if target == null:
-			_log("%s выпускает Огненную стрелу без цели. Потрачено 5 маны." % hero.name())
+			_log("%s выпускает Огненную стрелу без цели." % hero.name())
 			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": null, "hit": false, "damage": 0})
 		else:
 			var damage := _roll_dice("1d8")
-			_log("%s применяет Огненную стрелу к %s: магия попадает всегда, 1д8 = %d урона; −5 маны." % [hero.name(), target.name(), damage])
+			_log("%s применяет Огненную стрелу к %s: 1д8 = %d урона." % [hero.name(), target.name(), damage])
 			_apply_damage(hero, target, damage)
 			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": target, "hit": true, "damage": damage})
 	elif action_id == "quick_heal":
@@ -152,15 +152,15 @@ func perform_action(index: int, action_id: String) -> bool:
 		hero.mana -= 5
 		var target = _lowest_health_hero()
 		if target == null:
-			_log("%s применяет Быстрое лечение без цели. Потрачено 5 маны." % hero.name())
+			_log("%s применяет Быстрое лечение без цели." % hero.name())
 			visual_event.emit({"kind": "quick_heal", "unit": hero, "target": null, "amount": 0, "revived": false})
 		else:
 			var was_unconscious: bool = not target.conscious()
 			var recovered: int = target.restore_health(6)
 			if recovered > 0:
-				_log("%s лечит %s: +%d здоровья (%d/%d); −5 маны." % [hero.name(), target.name(), recovered, target.health, target.max_health()])
+				_log("%s лечит %s: +%d здоровья (%d/%d)." % [hero.name(), target.name(), recovered, target.health, target.max_health()])
 			else:
-				_log("%s лечит %s: здоровье уже полное (%d/%d); −5 маны." % [hero.name(), target.name(), target.health, target.max_health()])
+				_log("%s лечит %s: здоровье уже полное (%d/%d)." % [hero.name(), target.name(), target.health, target.max_health()])
 			visual_event.emit({"kind": "quick_heal", "unit": hero, "target": target, "amount": recovered, "revived": was_unconscious and target.conscious()})
 	else:
 		return false
