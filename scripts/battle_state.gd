@@ -19,6 +19,7 @@ var phase := "heroes"
 var round_number := 0
 var hero_turn_cursor := 0
 var enemy_turn_cursor := 0
+var enemy_turn_limit := 0
 var turn_delay := 0.0
 var defeated_enemies := 0
 var pending_projectiles: Array[Dictionary] = []
@@ -40,6 +41,7 @@ func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]
 	round_number = 0
 	hero_turn_cursor = 0
 	enemy_turn_cursor = 0
+	enemy_turn_limit = 0
 	turn_delay = 0.0
 	defeated_enemies = 0
 	pending_projectiles.clear()
@@ -48,7 +50,7 @@ func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]
 		var unit = COMBATANT.new()
 		unit.initialize(hero_profiles[index], true, Vector2i(0, BOARD.HERO_ROWS[index]))
 		heroes.append(unit)
-	_log("Бой начался. Герои: %d; враги в очереди: %d." % [heroes.size(), enemies_remaining_to_spawn])
+	_log("Бой начался. Герои: %d; выбрано врагов: %d." % [heroes.size(), enemies_remaining_to_spawn])
 	_begin_round()
 	_check_end()
 
@@ -63,6 +65,7 @@ func tick(delta: float) -> void:
 	turn_delay = maxf(0.0, turn_delay - delta)
 	if turn_delay > 0.0:
 		return
+	_fill_spawn_cells()
 	if phase == "heroes":
 		if selected_hero < 0:
 			_advance_hero_turn()
@@ -93,10 +96,10 @@ func _begin_round() -> void:
 	phase = "heroes"
 	hero_turn_cursor = 0
 	enemy_turn_cursor = 0
+	enemy_turn_limit = 0
 	selected_hero = -1
 	_log("Раунд %d: ход героев." % round_number)
-	if enemies_remaining_to_spawn > 0:
-		_spawn_enemy()
+	_fill_spawn_cells()
 	_advance_hero_turn()
 
 
@@ -110,11 +113,12 @@ func _advance_hero_turn() -> void:
 	selected_hero = -1
 	phase = "enemies"
 	enemy_turn_cursor = 0
+	enemy_turn_limit = enemies.size()
 	_log("Раунд %d: ход врагов." % round_number)
 
 
 func _take_next_enemy_turn() -> void:
-	while enemy_turn_cursor < enemies.size():
+	while enemy_turn_cursor < enemy_turn_limit:
 		var enemy = enemies[enemy_turn_cursor]
 		enemy_turn_cursor += 1
 		if enemy.conscious():
@@ -227,6 +231,12 @@ func _update_enemy(enemy) -> void:
 	enemy.cell = next_cell
 	_log("%s перемещается на одну клетку." % enemy.name())
 	turn_delay = 0.95
+
+
+func _fill_spawn_cells() -> void:
+	while enemies_remaining_to_spawn > 0:
+		if not _spawn_enemy():
+			break
 
 
 func _spawn_enemy() -> bool:
@@ -432,6 +442,8 @@ func _apply_damage(_attacker, target, amount: int) -> void:
 		if target.health <= 0:
 			defeated_enemies += 1
 			_log("%s погибает." % target.name())
+			if target.cell.x == BOARD.COLUMNS - 1 and enemies_remaining_to_spawn > 0:
+				turn_delay = maxf(turn_delay, 0.9)
 
 
 func _roll_dice(notation: String) -> int:
