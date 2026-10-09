@@ -150,7 +150,6 @@ func _handle_click(point: Vector2) -> void:
 func _draw() -> void:
 	draw_texture_rect(BACKGROUND, Rect2(Vector2.ZERO, SCREEN_SIZE), false)
 	_draw_top_status()
-	_draw_board()
 	_draw_units()
 	_draw_visual_effects()
 	_draw_hero_panel()
@@ -175,28 +174,12 @@ func _living_enemy_count() -> int:
 	return result
 
 
-func _draw_board() -> void:
-	for row in range(BOARD.ROWS):
-		for column in range(BOARD.COLUMNS):
-			var cell := Vector2i(column, row)
-			var rect: Rect2 = BOARD.cell_rect(cell)
-			var shade := 0.12 if (row + column) % 2 == 0 else 0.08
-			draw_rect(rect, Color(0.26, 0.21, 0.10, shade), true)
-			draw_rect(rect, Color(0.95, 0.86, 0.63, 0.82), false, 2.0)
-
-
 func _draw_units() -> void:
 	for enemy in battle.enemies:
 		var enemy_id: int = enemy.get_instance_id()
 		if enemy.conscious() or death_animations.has(enemy_id):
-			if enemy.conscious() and not movement_animations.has(enemy_id):
-				_draw_cell_frame(enemy.cell, Color(0.92, 0.50, 0.24, 0.88), false)
 			_draw_animated_unit(enemy)
-	for index in range(battle.heroes.size()):
-		var hero = battle.heroes[index]
-		var selected: bool = battle.can_hero_act(index)
-		var color := Color("f9d45c") if selected else Color("92999d")
-		_draw_cell_frame(hero.cell, color, selected)
+	for hero in battle.heroes:
 		_draw_animated_unit(hero)
 
 
@@ -313,47 +296,41 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 	var frame_width: float = float(sheet.get_width()) / 4.0
 	var frame_height: float = float(sheet.get_height()) / float(fall_row + 1)
 	var source := Rect2(float(column) * frame_width, float(row) * frame_height, frame_width, frame_height)
-	var size := Vector2(128, 128) if unit.is_hero else Vector2(126, 126)
+	var size := Vector2(170, 170) if unit.is_hero else Vector2(168, 168)
 	if not unit.is_hero and unit.id() == "forest_wolf":
-		size = Vector2(148, 124)
+		size = Vector2(194, 160)
 	var center: Vector2 = _unit_position(unit)
 	draw_texture_rect_region(sheet, Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size), source, tint)
 	if not unit.is_hero and unit.conscious():
 		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
-		draw_rect(Rect2(center + Vector2(-35, -58), Vector2(70, 6)), Color(0.12, 0.04, 0.04, 0.8), true)
-		draw_rect(Rect2(center + Vector2(-34, -57), Vector2(68.0 * ratio, 4)), Color("d84b39"), true)
-
-
-func _draw_cell_frame(cell: Vector2i, color: Color, selected: bool) -> void:
-	var rect: Rect2 = BOARD.cell_rect(cell).grow(-4.0)
-	draw_rect(rect, Color(color.r, color.g, color.b, 0.18 if selected else 0.09), true)
-	draw_rect(rect, color, false, 5.0 if selected else 3.0)
+		draw_rect(Rect2(center + Vector2(-45, -93), Vector2(90, 7)), Color(0.12, 0.04, 0.04, 0.8), true)
+		draw_rect(Rect2(center + Vector2(-44, -92), Vector2(88.0 * ratio, 5)), Color("d84b39"), true)
 
 
 func _draw_hero_sprite(hero, center: Vector2, tint: Color) -> void:
 	match hero.class_id():
 		"warrior":
-			draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(52, 55), Vector2(104, 110)), Rect2(45, 46, 275, 246), tint)
+			draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(73, 77), Vector2(146, 154)), Rect2(45, 46, 275, 246), tint)
 		"mage":
-			draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(51, 54), Vector2(102, 108)), Rect2(48, 288, 270, 220), tint)
+			draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(73, 77), Vector2(146, 154)), Rect2(48, 288, 270, 220), tint)
 		"cleric":
-			draw_texture_rect(CLERIC, Rect2(center - Vector2(52, 55), Vector2(104, 110)), false, tint)
+			draw_texture_rect(CLERIC, Rect2(center - Vector2(73, 77), Vector2(146, 154)), false, tint)
 		"archer":
-			draw_texture_rect(ARCHER_SPRITE, Rect2(center - Vector2(45, 72), Vector2(90, 135)), false, tint)
+			draw_texture_rect(ARCHER_SPRITE, Rect2(center - Vector2(59, 83), Vector2(118, 166)), false, tint)
 
 
 func _draw_enemy(enemy, center: Vector2, tint: Color) -> void:
 	var enemy_id: String = enemy.id()
 	if enemy_id == "forest_wolf":
-		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(61, 49), Vector2(122, 98)), Rect2(1262, 436, 306, 170), tint)
+		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(84, 67), Vector2(168, 134)), Rect2(1262, 436, 306, 170), tint)
 	else:
 		var base_tint: Color = Color(0.72, 0.78, 0.84) if enemy_id == "armored_goblin" else Color.WHITE
-		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(52, 51), Vector2(104, 102)), Rect2(1270, 270, 250, 166), base_tint * tint)
+		draw_texture_rect_region(COMBATANTS, Rect2(center - Vector2(74, 73), Vector2(148, 146)), Rect2(1270, 270, 250, 166), base_tint * tint)
 	if not enemy.conscious():
 		return
 	var ratio: float = clampf(float(enemy.health) / float(maxi(1, enemy.max_health())), 0.0, 1.0)
-	draw_rect(Rect2(center + Vector2(-35, -58), Vector2(70, 6)), Color(0.12, 0.04, 0.04, 0.8), true)
-	draw_rect(Rect2(center + Vector2(-34, -57), Vector2(68.0 * ratio, 4)), Color("d84b39"), true)
+	draw_rect(Rect2(center + Vector2(-45, -93), Vector2(90, 7)), Color(0.12, 0.04, 0.04, 0.8), true)
+	draw_rect(Rect2(center + Vector2(-44, -92), Vector2(88.0 * ratio, 5)), Color("d84b39"), true)
 
 
 func _unit_position(unit) -> Vector2:
