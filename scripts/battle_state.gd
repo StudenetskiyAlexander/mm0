@@ -8,7 +8,7 @@ const BOARD = preload("res://scripts/battle_board.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
 const PROJECTILE_LAUNCH_DELAY := 0.32
 const ACTION_ANIMATION_TIME := 0.55
-const ENEMY_MOVE_CELLS_PER_TURN := 3
+const ENEMY_MOVE_CELLS_PER_TURN := 1
 
 var heroes: Array = []
 var enemies: Array = []
@@ -219,19 +219,14 @@ func _update_enemy(enemy) -> void:
 		_physical_attack(enemy, target, false)
 		turn_delay = ACTION_ANIMATION_TIME
 		return
-	var steps := 0
-	while steps < ENEMY_MOVE_CELLS_PER_TURN:
-		var next_cell := _next_step(enemy.cell, target.cell, attack_range)
-		if next_cell.x < 0:
-			break
-		visual_event.emit({"kind": "move", "unit": enemy, "from_cell": enemy.cell, "to_cell": next_cell, "speed": float(ENEMY_MOVE_CELLS_PER_TURN)})
-		enemy.cell = next_cell
-		steps += 1
-		if BOARD.attack_distance(enemy.cell, target.cell) <= attack_range:
-			break
-	if steps > 0:
-		_log("%s перемещается на %d клет." % [enemy.name(), steps])
-	turn_delay = maxf(0.16, 0.95 * float(steps) / float(ENEMY_MOVE_CELLS_PER_TURN))
+	var next_cell := _next_step(enemy.cell, target.cell, attack_range)
+	if next_cell.x < 0:
+		turn_delay = 0.16
+		return
+	visual_event.emit({"kind": "move", "unit": enemy, "from_cell": enemy.cell, "to_cell": next_cell, "speed": float(ENEMY_MOVE_CELLS_PER_TURN)})
+	enemy.cell = next_cell
+	_log("%s перемещается на одну клетку." % enemy.name())
+	turn_delay = 0.95
 
 
 func _spawn_enemy() -> bool:
