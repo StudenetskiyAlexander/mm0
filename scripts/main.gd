@@ -8,8 +8,10 @@ const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-8f.png")
 const MAGE_ANIMATION: Texture2D = preload("res://assets/mage-animation-8f.png")
+const MAGE_IDLE: Texture2D = preload("res://assets/mage-idle.png")
 const CLERIC_ANIMATION: Texture2D = preload("res://assets/cleric-animation-8f.png")
 const ARCHER_ANIMATION: Texture2D = preload("res://assets/archer-animation-8f.png")
+const ARCHER_IDLE: Texture2D = preload("res://assets/archer-idle.png")
 const SMALL_GOBLIN_ANIMATION: Texture2D = preload("res://assets/small-goblin-animation-8f.png")
 const ARMORED_GOBLIN_ANIMATION: Texture2D = preload("res://assets/armored-goblin-animation-8f.png")
 const WOLF_ANIMATION: Texture2D = preload("res://assets/wolf-animation-8f.png")
@@ -415,7 +417,13 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		elif row == 2:
 			size *= float(CLERIC_HEAL_FRAME_SCALES[frame])
 	var destination := Rect2(Vector2(center.x - size.x * 0.5, bottom_y - size.y), size)
-	_draw_sprite_frame(sheet, destination, frame, row, fall_row + 1, tint)
+	var use_standing_sprite: bool = unit.is_hero and unit.conscious() and not movement_animations.has(unit_id) and not action_animations.has(unit_id) and not impact_animations.has(unit_id) and not fall_animations.has(unit_id) and not death_animations.has(unit_id)
+	if use_standing_sprite and unit.class_id() == "mage":
+		draw_texture_rect(MAGE_IDLE, destination, false, tint)
+	elif use_standing_sprite and unit.class_id() == "archer":
+		draw_texture_rect(ARCHER_IDLE, destination, false, tint)
+	else:
+		_draw_sprite_frame(sheet, destination, frame, row, fall_row + 1, tint)
 	if not unit.is_hero and unit.conscious():
 		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
 		var is_goblin: bool = unit.id() == "small_goblin" or unit.id() == "armored_goblin"

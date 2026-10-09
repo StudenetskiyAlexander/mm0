@@ -3,6 +3,7 @@ extends SceneTree
 # Generated poses may cross nominal column edges. Extract each connected
 # silhouette, then place it inside one cell with a guaranteed transparent gutter.
 const UNITS := ["warrior", "mage", "cleric", "cleric-female", "archer", "small-goblin", "armored-goblin", "wolf"]
+const IDLE_UNITS := ["mage", "archer"]
 const COLUMNS := 8
 const MIN_SILHOUETTE_PIXELS := 3000
 const ATLAS_WIDTH_SCALE := 1.25
@@ -27,7 +28,53 @@ func _init() -> void:
 			quit(1)
 			return
 		print("Created %s" % destination)
+	for unit_id in IDLE_UNITS:
+		if not _create_idle_frame(unit_id):
+			quit(1)
+			return
 	quit()
+
+
+func _create_idle_frame(unit_id: String) -> bool:
+	var source_path: String = ProjectSettings.globalize_path("res://assets/animation_chroma/%s-idle.png" % unit_id)
+	var atlas_path: String = ProjectSettings.globalize_path("res://assets/%s-animation-8f.png" % unit_id)
+	var destination: String = ProjectSettings.globalize_path("res://assets/%s-idle.png" % unit_id)
+	var source: Image = Image.load_from_file(source_path)
+	var atlas: Image = Image.load_from_file(atlas_path)
+	if source == null or source.is_empty() or atlas == null or atlas.is_empty():
+		push_error("Cannot read idle source or animation atlas for %s" % unit_id)
+		return false
+	source.convert(Image.FORMAT_RGBA8)
+	_key_green(source)
+	var left: int = source.get_width()
+	var top: int = source.get_height()
+	var right: int = -1
+	var bottom: int = -1
+	for y in range(source.get_height()):
+		for x in range(source.get_width()):
+			if source.get_pixel(x, y).a < 0.5:
+				continue
+			left = mini(left, x)
+			top = mini(top, y)
+			right = maxi(right, x)
+			bottom = maxi(bottom, y)
+	if right < left:
+		push_error("Idle sprite has no visible pixels: %s" % source_path)
+		return false
+	var cutout: Image = source.get_region(Rect2i(left, top, right - left + 1, bottom - top + 1))
+	var frame_size := Vector2i(roundi(float(atlas.get_width()) / COLUMNS), roundi(float(atlas.get_height()) / 4.0))
+	var scale: float = minf(float(frame_size.x) * 0.86 / cutout.get_width(), float(frame_size.y) * 0.74 / cutout.get_height())
+	cutout.resize(roundi(cutout.get_width() * scale), roundi(cutout.get_height() * scale), Image.INTERPOLATE_BILINEAR)
+	var result: Image = Image.create_empty(frame_size.x, frame_size.y, false, Image.FORMAT_RGBA8)
+	result.fill(Color.TRANSPARENT)
+	var position := Vector2i((frame_size.x - cutout.get_width()) / 2, roundi(frame_size.y * 0.95) - cutout.get_height())
+	result.blend_rect(cutout, Rect2i(Vector2i.ZERO, cutout.get_size()), position)
+	var error: Error = result.save_png(destination)
+	if error != OK:
+		push_error("Cannot write idle sprite: %s (%d)" % [destination, error])
+		return false
+	print("Created %s" % destination)
+	return true
 
 
 func _key_green(image: Image) -> void:
