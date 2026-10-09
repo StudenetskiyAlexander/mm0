@@ -236,7 +236,7 @@ func _draw() -> void:
 	draw_texture_rect(BACKGROUND, Rect2(Vector2.ZERO, SCREEN_SIZE), false)
 	_draw_top_status()
 	_draw_units()
-	_draw_targeting_markers()
+	_draw_targeting_banner()
 	_draw_visual_effects()
 	_draw_hero_panel()
 	_draw_journal_preview()
@@ -269,18 +269,9 @@ func _draw_units() -> void:
 		_draw_animated_unit(hero)
 
 
-func _draw_targeting_markers() -> void:
+func _draw_targeting_banner() -> void:
 	if targeting_action == "" or not battle.can_hero_act(targeting_hero_index):
 		return
-	var mouse_point: Vector2 = get_local_mouse_position()
-	var targets: Array = battle.available_heal_targets(targeting_hero_index) if targeting_action == "quick_heal" else battle.available_enemy_targets(targeting_hero_index, targeting_action)
-	for target in targets:
-		var center: Vector2 = _unit_position(target)
-		var hovered: bool = _target_hitbox(target).has_point(mouse_point)
-		if targeting_action == "quick_heal":
-			hovered = hovered or _hero_portrait_rect(battle.heroes.find(target)).has_point(mouse_point)
-		if hovered:
-			_draw_target_sign(center + Vector2(48 if target.is_hero else -48, -88), targeting_action == "quick_heal")
 	var key := "E"
 	if targeting_action == "melee_attack":
 		key = "Q"
@@ -291,19 +282,6 @@ func _draw_targeting_markers() -> void:
 	draw_rect(banner, Color("8ee6b0") if targeting_action == "quick_heal" else Color("e6b974"), false, 2.0)
 	var prompt := "ВЫБЕРИТЕ ГЕРОЯ  ·  ESC — ОТМЕНА  ·  E — САМЫЙ РАНЕНЫЙ" if targeting_action == "quick_heal" else "ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key
 	_text(prompt, Vector2(664, 131), 16, Color("e3f4df"), 590.0)
-
-
-func _draw_target_sign(center: Vector2, healing: bool) -> void:
-	var edge: Color = Color("a9f0c3") if healing else Color("ffda8b")
-	draw_colored_polygon(PackedVector2Array([center + Vector2(0, -14), center + Vector2(14, 0), center + Vector2(0, 14), center + Vector2(-14, 0)]), Color(0.05, 0.10, 0.10, 0.9))
-	draw_polyline(PackedVector2Array([center + Vector2(0, -14), center + Vector2(14, 0), center + Vector2(0, 14), center + Vector2(-14, 0), center + Vector2(0, -14)]), edge, 2.0, true)
-	if healing:
-		draw_line(center + Vector2(-7, 0), center + Vector2(7, 0), edge, 3.0, true)
-		draw_line(center + Vector2(0, -7), center + Vector2(0, 7), edge, 3.0, true)
-	else:
-		draw_line(center + Vector2(-5, 6), center + Vector2(6, -7), edge, 2.5, true)
-		draw_line(center + Vector2(-6, 2), center + Vector2(-1, 7), edge, 2.0, true)
-		draw_line(center + Vector2(-7, 9), center + Vector2(-4, 6), edge, 2.0, true)
 
 
 func _target_hitbox(unit) -> Rect2:
