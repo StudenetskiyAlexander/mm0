@@ -1,11 +1,14 @@
 extends Node
 
 const BOARD = preload("res://scripts/battle_board.gd")
-const MUSIC_TITLES := ["Героический поход", "Туманные перевалы", "Железный рубеж"]
+const MUSIC_RANDOM_ID := 999
+const MUSIC_TITLES := ["Героический поход", "Туманные перевалы", "Железный рубеж", "Атака на рассвете", "Последний бастион"]
 const BATTLE_THEMES := [
 	preload("res://assets/audio/battle-theme.wav"),
 	preload("res://assets/audio/battle-misty-pass.wav"),
 	preload("res://assets/audio/battle-iron-march.wav"),
+	preload("res://assets/audio/battle-dawn-assault.wav"),
+	preload("res://assets/audio/battle-last-bastion.wav"),
 ]
 const SOUNDS := {
 	"sword_swing": preload("res://assets/audio/sword_swing.wav"),
@@ -58,9 +61,9 @@ func _process(delta: float) -> void:
 			queued_sounds[index] = sound
 
 
-func start_battle(theme_index: int = 0) -> void:
+func start_battle(theme_index: int = MUSIC_RANDOM_ID) -> void:
 	stop_battle()
-	music_player.stream = BATTLE_THEMES[clampi(theme_index, 0, BATTLE_THEMES.size() - 1)]
+	music_player.stream = BATTLE_THEMES[_resolve_theme_index(theme_index)]
 	music_enabled = true
 	paused = false
 	music_player.stream_paused = false
@@ -87,10 +90,16 @@ func stop_battle() -> void:
 
 func preview_theme(theme_index: int) -> void:
 	stop_battle()
-	music_player.stream = BATTLE_THEMES[clampi(theme_index, 0, BATTLE_THEMES.size() - 1)]
+	music_player.stream = BATTLE_THEMES[_resolve_theme_index(theme_index)]
 	music_player.stream_paused = false
 	previewing = true
 	music_player.play()
+
+
+func _resolve_theme_index(theme_index: int) -> int:
+	if theme_index == MUSIC_RANDOM_ID:
+		return randi_range(0, BATTLE_THEMES.size() - 1)
+	return clampi(theme_index, 0, BATTLE_THEMES.size() - 1)
 
 
 func stop_preview() -> void:

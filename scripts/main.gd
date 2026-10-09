@@ -992,6 +992,7 @@ func _build_setup_overlay() -> void:
 	music_select = OptionButton.new()
 	music_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	music_select.custom_minimum_size = Vector2(0, 44)
+	music_select.add_item("Случайная", BATTLE_AUDIO.MUSIC_RANDOM_ID)
 	for index in range(BATTLE_AUDIO.MUSIC_TITLES.size()):
 		music_select.add_item(str(BATTLE_AUDIO.MUSIC_TITLES[index]), index)
 	music_select.select(0)

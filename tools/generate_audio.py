@@ -79,6 +79,13 @@ def tone(midi: int, duration: float, instrument: str) -> np.ndarray:
         value = 0.70 * np.sin(phase) + 0.20 * np.sin(2.0 * phase)
         value += 0.16 * np.sin(2.0 * np.pi * hz * 1.006 * t)
         value *= envelope(count, 0.28, 0.40)
+    elif instrument == "short_strings":
+        phase = 2.0 * np.pi * hz * t
+        value = sum(
+            strength * np.sin(phase * harmonic + harmonic * 0.17)
+            for harmonic, strength in ((1, .57), (2, .31), (3, .20), (4, .12), (5, .07))
+        )
+        value *= envelope(count, .012, .065) * np.exp(-t * 1.45)
     else:
         raise ValueError(instrument)
     return value.astype(np.float32)
@@ -111,6 +118,14 @@ def snare() -> np.ndarray:
     bright = noise - np.convolve(noise, np.ones(11) / 11, mode="same")
     body = np.sin(2.0 * np.pi * 176.0 * t)
     return (bright * 0.28 + body * 0.18).astype(np.float32) * np.exp(-t * 18.0)
+
+
+def cymbal() -> np.ndarray:
+    duration = .55
+    t = np.arange(int(duration * RATE), dtype=np.float32) / RATE
+    noise = RNG.standard_normal(len(t))
+    bright = noise - np.convolve(noise, np.ones(21) / 21, mode="same")
+    return (bright * np.exp(-t * 10.0) * .27).astype(np.float32)
 
 
 def battle_theme() -> np.ndarray:
@@ -292,6 +307,114 @@ def iron_march_theme() -> np.ndarray:
     return finish_loop(track, .22)
 
 
+def dawn_assault_theme() -> np.ndarray:
+    """Fast, bright D-major charge with a driving string pulse and brass calls."""
+    beat = 60.0 / 138.0
+    bar = 4.0 * beat
+    chords = [
+        (50, 54, 57), (55, 59, 62), (47, 50, 54), (45, 49, 52),
+        (50, 54, 57), (55, 59, 62), (52, 55, 59), (45, 49, 52),
+        (47, 50, 54), (55, 59, 62), (50, 54, 57), (45, 49, 52),
+        (52, 55, 59), (55, 59, 62), (45, 49, 52), (50, 54, 57),
+    ]
+    melody = [
+        [(0, 74, .5), (.5, 78, .5), (1, 81, 1), (2, 78, .5), (2.5, 76, .5), (3, 74, 1)],
+        [(0, 79, .5), (.5, 83, .5), (1, 86, 1), (2, 83, 1), (3, 79, 1)],
+        [(0, 78, .75), (1, 74, .5), (1.5, 71, .5), (2, 74, 1), (3, 78, 1)],
+        [(0, 76, .5), (.5, 73, .5), (1, 69, 1), (2, 73, .5), (2.5, 76, .5), (3, 81, 1)],
+        [(0, 86, 1), (1, 81, .5), (1.5, 78, .5), (2, 74, 1), (3, 78, 1)],
+        [(0, 83, .5), (.5, 79, .5), (1, 74, 1), (2, 79, .5), (2.5, 83, .5), (3, 86, 1)],
+        [(0, 83, 1), (1, 79, .5), (1.5, 76, .5), (2, 71, 1), (3, 76, 1)],
+        [(0, 81, .75), (1, 76, .5), (1.5, 73, .5), (2, 76, 1), (3, 81, 1)],
+        [(0, 83, .5), (.5, 86, .5), (1, 90, 1), (2, 86, .5), (2.5, 83, .5), (3, 78, 1)],
+        [(0, 79, .5), (.5, 83, .5), (1, 86, 1), (2, 79, 1), (3, 74, 1)],
+        [(0, 78, 1), (1, 81, .5), (1.5, 86, .5), (2, 90, 1), (3, 86, 1)],
+        [(0, 88, .75), (1, 85, .5), (1.5, 81, .5), (2, 76, 1), (3, 73, 1)],
+        [(0, 79, .5), (.5, 83, .5), (1, 86, 1), (2, 83, .5), (2.5, 79, .5), (3, 76, 1)],
+        [(0, 83, 1), (1, 86, .5), (1.5, 91, .5), (2, 86, 1), (3, 83, 1)],
+        [(0, 81, .5), (.5, 85, .5), (1, 88, 1), (2, 85, .5), (2.5, 81, .5), (3, 76, 1)],
+        [(0, 86, 1.5), (1.5, 81, .5), (2, 78, 1), (3, 74, 1)],
+    ]
+    track = np.zeros((int(len(chords) * bar * RATE), 2), dtype=np.float32)
+    drum, snare_hit, crash = timpani(), snare(), cymbal()
+    for index, (root, third, fifth) in enumerate(chords):
+        start = index * bar
+        for pitch, pan in ((root, -.5), (third, .45), (fifth, -.12)):
+            place(track, tone(pitch, bar + .12, "strings"), start, .065, pan)
+        for step, pitch in enumerate((root + 12, fifth + 12, root + 12, fifth + 12,
+                                      third + 12, fifth + 12, root + 24, fifth + 12)):
+            place(track, tone(pitch, .37 * beat, "short_strings"), start + step * beat / 2,
+                  .155 if step in (0, 4) else .105, -.35 if step % 2 else .35)
+        for offset in (0, 1.5, 2, 3.5):
+            place(track, tone(root - 12, .39 * beat, "bass"), start + offset * beat,
+                  .19 if offset in (0, 2) else .11, -.1)
+        for offset, pitch, length in melody[index]:
+            place(track, tone(pitch, max(.14, length * beat * .88), "horn"),
+                  start + offset * beat, .22, .07)
+        place(track, drum, start, .18 if index % 4 == 0 else .13)
+        place(track, drum, start + 2 * beat, .12)
+        for offset in (1, 3):
+            place(track, snare_hit, start + offset * beat, .18, .10 if offset == 1 else -.10)
+        if index % 4 == 0:
+            place(track, crash, start, .17, .2)
+    return finish_loop(track, .18)
+
+
+def last_bastion_theme() -> np.ndarray:
+    """Darker G-minor battle theme with syncopated low strings and fast drums."""
+    beat = 60.0 / 148.0
+    bar = 4.0 * beat
+    chords = [
+        (43, 46, 50), (51, 55, 58), (53, 57, 60), (50, 53, 57),
+        (43, 46, 50), (48, 51, 55), (51, 55, 58), (50, 54, 57),
+        (46, 50, 53), (53, 57, 60), (48, 51, 55), (50, 54, 57),
+        (43, 46, 50), (51, 55, 58), (50, 54, 57), (43, 46, 50),
+    ]
+    melody = [
+        [(0, 67, .5), (.5, 70, .5), (1, 74, .5), (1.5, 70, .5), (2, 67, 1), (3, 74, 1)],
+        [(0, 75, .75), (1, 79, .5), (1.5, 82, .5), (2, 79, 1), (3, 75, 1)],
+        [(0, 77, .5), (.5, 81, .5), (1, 84, .5), (1.5, 81, .5), (2, 77, 1), (3, 72, 1)],
+        [(0, 74, 1), (1, 77, .5), (1.5, 81, .5), (2, 77, 1), (3, 74, 1)],
+        [(0, 79, .5), (.5, 74, .5), (1, 70, .5), (1.5, 67, .5), (2, 70, 1), (3, 74, 1)],
+        [(0, 72, .5), (.5, 75, .5), (1, 79, 1), (2, 75, .5), (2.5, 72, .5), (3, 67, 1)],
+        [(0, 75, 1), (1, 79, .5), (1.5, 82, .5), (2, 87, 1), (3, 82, 1)],
+        [(0, 78, .5), (.5, 81, .5), (1, 86, 1), (2, 81, .5), (2.5, 78, .5), (3, 74, 1)],
+        [(0, 82, .5), (.5, 86, .5), (1, 89, 1), (2, 86, .5), (2.5, 82, .5), (3, 77, 1)],
+        [(0, 84, .5), (.5, 81, .5), (1, 77, 1), (2, 72, .5), (2.5, 77, .5), (3, 81, 1)],
+        [(0, 79, .75), (1, 75, .5), (1.5, 72, .5), (2, 75, 1), (3, 79, 1)],
+        [(0, 86, 1), (1, 81, .5), (1.5, 78, .5), (2, 74, 1), (3, 78, 1)],
+        [(0, 82, .5), (.5, 79, .5), (1, 74, .5), (1.5, 70, .5), (2, 67, 1), (3, 74, 1)],
+        [(0, 87, 1), (1, 82, .5), (1.5, 79, .5), (2, 75, 1), (3, 79, 1)],
+        [(0, 86, .5), (.5, 81, .5), (1, 78, 1), (2, 74, .5), (2.5, 78, .5), (3, 81, 1)],
+        [(0, 79, 1.5), (1.5, 74, .5), (2, 70, 1), (3, 67, 1)],
+    ]
+    track = np.zeros((int(len(chords) * bar * RATE), 2), dtype=np.float32)
+    drum, snare_hit, crash = timpani(), snare(), cymbal()
+    for index, (root, third, fifth) in enumerate(chords):
+        start = index * bar
+        for pitch, pan in ((root + 12, -.5), (third + 12, .4), (fifth + 12, -.1)):
+            place(track, tone(pitch, bar + .13, "strings"), start, .058, pan)
+        for step, pitch in enumerate((root + 12, root + 12, fifth + 12, root + 12,
+                                      third + 12, root + 12, fifth + 12, third + 12)):
+            if step in (3, 7):
+                continue
+            place(track, tone(pitch, .34 * beat, "short_strings"), start + step * beat / 2,
+                  .17 if step in (0, 4) else .12, -.45 if step % 2 else .4)
+        for offset in (0, .75, 1.5, 2, 2.75, 3.5):
+            place(track, tone(root - 12, .32 * beat, "bass"), start + offset * beat,
+                  .23 if offset in (0, 2) else .13, -.1)
+        for offset, pitch, length in melody[index]:
+            place(track, tone(pitch, max(.13, length * beat * .87), "horn"),
+                  start + offset * beat, .205, .04)
+        for offset, level in ((0, .17), (1.5, .075), (2, .16), (3.5, .075)):
+            place(track, drum, start + offset * beat, level)
+        for offset, level in ((1, .20), (2.5, .12), (3, .21)):
+            place(track, snare_hit, start + offset * beat, level, .13 if offset == 2.5 else -.08)
+        if index % 4 == 0:
+            place(track, crash, start, .14, -.2)
+    return finish_loop(track, .16)
+
+
 def sweep(duration: float, start_hz: float, end_hz: float) -> tuple[np.ndarray, np.ndarray]:
     t = np.arange(int(duration * RATE), dtype=np.float32) / RATE
     phase = 2.0 * np.pi * (start_hz * t + (end_hz - start_hz) * t * t / (2.0 * duration))
@@ -386,4 +509,6 @@ if __name__ == "__main__":
         write_wav(OUT / f"{name}.wav", sound, .72)
     write_wav(OUT / "battle-misty-pass.wav", misty_pass_theme(), .78)
     write_wav(OUT / "battle-iron-march.wav", iron_march_theme(), .78)
+    write_wav(OUT / "battle-dawn-assault.wav", dawn_assault_theme(), .78)
+    write_wav(OUT / "battle-last-bastion.wav", last_bastion_theme(), .78)
     print(f"Created original battle audio in {OUT}")
