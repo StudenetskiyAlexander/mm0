@@ -127,14 +127,53 @@ func _take_next_enemy_turn() -> void:
 	_begin_round()
 
 
-func perform_selected(action_id: String) -> bool:
-	return perform_action(selected_hero, action_id)
+func available_enemy_targets(index: int, action_id: String) -> Array:
+	var targets: Array = []
+	if not can_hero_act(index):
+		return targets
+	var hero = heroes[index]
+	if not hero.has_action(action_id):
+		return targets
+	var minimum_range := 1
+	var maximum_range := -1
+	match action_id:
+		"melee_attack":
+			maximum_range = 1
+		"shoot":
+			if not can_shoot(hero):
+				return targets
+			minimum_range = int(hero.weapon(true).get("minimum_attack_range_cells", 2))
+		"fire_arrow":
+			if hero.mana < 5:
+				return targets
+		_:
+			return targets
+	for enemy in enemies:
+		if not enemy.conscious():
+			continue
+		var distance: int = BOARD.attack_distance(hero.cell, enemy.cell)
+		if distance >= minimum_range and (maximum_range < 0 or distance <= maximum_range):
+			targets.append(enemy)
+	return targets
 
 
-func perform_action(index: int, action_id: String) -> bool:
+func perform_selected(action_id: String, target_override = null) -> bool:
+	return perform_action(selected_hero, action_id, target_override)
+
+
+func perform_action(index: int, action_id: String, target_override = null) -> bool:
 	if not can_hero_act(index):
 		return false
 	var hero = heroes[index]
+	var enemy_target = null
+	if action_id == "melee_attack" or action_id == "shoot" or action_id == "fire_arrow":
+		var targets: Array = available_enemy_targets(index, action_id)
+		if target_override != null:
+			if not targets.has(target_override):
+				return false
+			enemy_target = target_override
+		elif not targets.is_empty():
+			enemy_target = targets[rng.randi_range(0, targets.size() - 1)]
 	if action_id == "health_potion":
 		if hero.health_potions <= 0:
 			return false
@@ -158,7 +197,7 @@ func perform_action(index: int, action_id: String) -> bool:
 	elif not hero.has_action(action_id):
 		return false
 	elif action_id == "melee_attack":
-		var target = _nearest_enemy(hero.cell, 1, 1)
+		var target = enemy_target
 		if target == null:
 			_log("%s атакует пустую клетку." % hero.name())
 			visual_event.emit({"kind": "melee", "unit": hero, "target": null, "hit": false, "damage": 0})
@@ -167,8 +206,7 @@ func perform_action(index: int, action_id: String) -> bool:
 	elif action_id == "shoot":
 		if not can_shoot(hero):
 			return false
-		var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_cells", 2))
-		var target = _nearest_enemy(hero.cell, minimum_range, -1)
+		var target = enemy_target
 		if target == null:
 			_log("%s выпускает стрелу, но подходящей цели нет." % hero.name())
 			visual_event.emit({"kind": "shoot", "unit": hero, "target": null, "hit": false, "damage": 0})
@@ -179,7 +217,7 @@ func perform_action(index: int, action_id: String) -> bool:
 		if hero.mana < 5:
 			return false
 		hero.mana -= 5
-		var target = _nearest_enemy(hero.cell, 1, -1)
+		var target = enemy_target
 		if target == null:
 			_log("%s выпускает Огненную стрелу без цели." % hero.name())
 			visual_event.emit({"kind": "fire_arrow", "unit": hero, "target": null, "hit": false, "damage": 0})
@@ -277,25 +315,6 @@ func _nearest_hero(from_cell: Vector2i):
 			closest = [hero]
 		elif distance == best_distance:
 			closest.append(hero)
-	if closest.is_empty():
-		return null
-	return closest[rng.randi_range(0, closest.size() - 1)]
-
-
-func _nearest_enemy(from_cell: Vector2i, minimum_range: int, maximum_range: int):
-	var closest: Array = []
-	var best_distance := 999
-	for enemy in enemies:
-		if not enemy.conscious():
-			continue
-		var distance: int = BOARD.attack_distance(from_cell, enemy.cell)
-		if distance < minimum_range or (maximum_range >= 0 and distance > maximum_range):
-			continue
-		if distance < best_distance:
-			best_distance = distance
-			closest = [enemy]
-		elif distance == best_distance:
-			closest.append(enemy)
 	if closest.is_empty():
 		return null
 	return closest[rng.randi_range(0, closest.size() - 1)]

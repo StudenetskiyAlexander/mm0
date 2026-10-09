@@ -48,6 +48,8 @@ var fall_animations: Dictionary = {}
 var death_animations: Dictionary = {}
 var portrait_reactions: Dictionary = {}
 var visual_effects: Array[Dictionary] = []
+var targeting_action := ""
+var targeting_hero_index := -1
 var wolf_animation: Texture2D
 var battle_audio
 
@@ -72,6 +74,8 @@ func _process(delta: float) -> void:
 	if setup_overlay.visible or log_panel.visible:
 		return
 	battle.tick(delta)
+	if targeting_action != "" and not battle.can_hero_act(targeting_hero_index):
+		_cancel_targeting()
 	_advance_animations(delta)
 	queue_redraw()
 
@@ -86,6 +90,7 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			_cancel_targeting()
 			log_panel.show()
 			get_viewport().set_input_as_handled()
 			return
@@ -101,22 +106,59 @@ func _handle_key(event: InputEventKey) -> void:
 	if key >= KEY_1 and key <= KEY_4:
 		battle.select_hero(key - KEY_1)
 	elif key == KEY_SPACE:
+		_cancel_targeting()
 		battle.skip_current_hero()
 	elif key == KEY_Q:
-		battle.perform_selected("melee_attack")
+		_activate_action("melee_attack")
 	elif key == KEY_W:
-		battle.perform_selected("shoot")
+		_activate_action("shoot")
 	elif key == KEY_E:
 		if battle.selected_hero >= 0:
-			battle.perform_selected(_spell_for(battle.heroes[battle.selected_hero]))
+			_activate_action(_spell_for(battle.heroes[battle.selected_hero]))
 	elif key == KEY_A:
-		battle.perform_selected("health_potion")
+		_activate_action("health_potion")
 	elif key == KEY_S:
-		battle.perform_selected("mana_potion")
+		_activate_action("mana_potion")
 	elif key == KEY_ESCAPE:
-		_show_setup()
+		if targeting_action != "":
+			_cancel_targeting()
+		else:
+			_show_setup()
 	queue_redraw()
 	get_viewport().set_input_as_handled()
+
+
+func _activate_action(action_id: String) -> void:
+	var index: int = battle.selected_hero
+	if action_id == "" or not battle.can_hero_act(index):
+		return
+	if action_id == "melee_attack" or action_id == "shoot" or action_id == "fire_arrow":
+		var targets: Array = battle.available_enemy_targets(index, action_id)
+		if targets.size() > 1:
+			if targeting_action == action_id and targeting_hero_index == index:
+				if battle.perform_action(index, action_id):
+					_cancel_targeting()
+			else:
+				targeting_action = action_id
+				targeting_hero_index = index
+				mouse_default_cursor_shape = Control.CURSOR_CROSS
+			queue_redraw()
+			return
+		if targets.size() == 1:
+			if battle.perform_action(index, action_id, targets[0]):
+				_cancel_targeting()
+			return
+	if battle.perform_action(index, action_id):
+		_cancel_targeting()
+
+
+func _cancel_targeting() -> void:
+	if targeting_action == "":
+		return
+	targeting_action = ""
+	targeting_hero_index = -1
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
+	queue_redraw()
 
 
 func _handle_click(point: Vector2) -> void:
@@ -124,8 +166,16 @@ func _handle_click(point: Vector2) -> void:
 		_show_setup()
 		return
 	if Rect2(375, 918, 1170, 58).has_point(point):
+		_cancel_targeting()
 		log_panel.show()
 		return
+	if targeting_action != "":
+		for enemy in battle.available_enemy_targets(targeting_hero_index, targeting_action):
+			if _target_hitbox(enemy).has_point(point):
+				if battle.perform_action(targeting_hero_index, targeting_action, enemy):
+					_cancel_targeting()
+				queue_redraw()
+				return
 	for index in range(battle.heroes.size()):
 		if BOARD.cell_rect(battle.heroes[index].cell).has_point(point):
 			battle.select_hero(index)
@@ -141,8 +191,7 @@ func _handle_click(point: Vector2) -> void:
 			if _slot_rect(top, slot).has_point(point):
 				if battle.select_hero(index):
 					var action_id := _slot_action_id(battle.heroes[index], slot)
-					if action_id != "":
-						battle.perform_action(index, action_id)
+					_activate_action(action_id)
 				queue_redraw()
 				return
 
@@ -151,6 +200,7 @@ func _draw() -> void:
 	draw_texture_rect(BACKGROUND, Rect2(Vector2.ZERO, SCREEN_SIZE), false)
 	_draw_top_status()
 	_draw_units()
+	_draw_targeting_markers()
 	_draw_visual_effects()
 	_draw_hero_panel()
 	_draw_journal_preview()
@@ -181,6 +231,31 @@ func _draw_units() -> void:
 			_draw_animated_unit(enemy)
 	for hero in battle.heroes:
 		_draw_animated_unit(hero)
+
+
+func _draw_targeting_markers() -> void:
+	if targeting_action == "" or not battle.can_hero_act(targeting_hero_index):
+		return
+	var mouse_point: Vector2 = get_local_mouse_position()
+	for enemy in battle.available_enemy_targets(targeting_hero_index, targeting_action):
+		var center: Vector2 = _unit_position(enemy)
+		var hovered: bool = _target_hitbox(enemy).has_point(mouse_point)
+		var color := Color("ffe396") if hovered else Color("8ee6b0")
+		draw_arc(center, 84.0, 0.0, TAU, 48, color, 3.0 if hovered else 2.0, true)
+		draw_circle(center + Vector2(0, 68), 4.0, color)
+	var key := "E"
+	if targeting_action == "melee_attack":
+		key = "Q"
+	elif targeting_action == "shoot":
+		key = "W"
+	var banner := Rect2(650, 101, 620, 49)
+	draw_rect(banner, Color(0.05, 0.09, 0.08, 0.91), true)
+	draw_rect(banner, Color("8ee6b0"), false, 2.0)
+	_text("ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key, Vector2(664, 131), 16, Color("e3f4df"), 590.0)
+
+
+func _target_hitbox(enemy) -> Rect2:
+	return Rect2(_unit_position(enemy) - Vector2(98, 88), Vector2(196, 176))
 
 
 func _draw_animated_unit(unit) -> void:
@@ -601,6 +676,8 @@ func _draw_action_slot(hero, top: float, slot: int) -> void:
 	var rect: Rect2 = _slot_rect(top, slot)
 	var available: bool = _slot_available(hero, slot)
 	var edge: Color = Color("c6ab76") if available else Color("77736d")
+	if available and battle.heroes.find(hero) == targeting_hero_index and _slot_action_id(hero, slot) == targeting_action:
+		edge = Color("8ee6b0")
 	draw_rect(rect, Color(0.09, 0.13, 0.17, 0.93) if available else Color(0.08, 0.08, 0.09, 0.86), true)
 	draw_rect(rect, edge, false, 2.0)
 	draw_rect(Rect2(rect.position + Vector2(3, 3), rect.size - Vector2(6, 6)), Color("4c5b63") if available else Color("36383a"), false, 1.0)
@@ -855,6 +932,7 @@ func _begin_battle() -> void:
 		if count > 0:
 			chosen_enemies.append({"profile": profile, "count": count})
 	combat_log.clear()
+	_cancel_targeting()
 	log_content.text = ""
 	_clear_animations()
 	setup_notice.text = ""
@@ -865,6 +943,7 @@ func _begin_battle() -> void:
 
 
 func _show_setup() -> void:
+	_cancel_targeting()
 	battle_audio.stop_battle()
 	log_panel.hide()
 	setup_overlay.show()
@@ -888,6 +967,7 @@ func _on_battle_event(message: String) -> void:
 
 
 func _on_battle_end(_victory: bool) -> void:
+	_cancel_targeting()
 	battle_audio.finish_battle()
 	queue_redraw()
 
