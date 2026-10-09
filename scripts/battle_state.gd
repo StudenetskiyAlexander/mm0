@@ -157,6 +157,19 @@ func available_enemy_targets(index: int, action_id: String) -> Array:
 	return targets
 
 
+func available_heal_targets(index: int) -> Array:
+	var targets: Array = []
+	if not can_hero_act(index):
+		return targets
+	var caster = heroes[index]
+	if not caster.has_action("quick_heal") or caster.mana < 5:
+		return targets
+	for hero in heroes:
+		if hero.alive():
+			targets.append(hero)
+	return targets
+
+
 func perform_selected(action_id: String, target_override = null) -> bool:
 	return perform_action(selected_hero, action_id, target_override)
 
@@ -174,6 +187,9 @@ func perform_action(index: int, action_id: String, target_override = null) -> bo
 			enemy_target = target_override
 		elif not targets.is_empty():
 			enemy_target = targets[rng.randi_range(0, targets.size() - 1)]
+	if action_id == "quick_heal" and target_override != null:
+		if not available_heal_targets(index).has(target_override):
+			return false
 	if action_id == "health_potion":
 		if hero.health_potions <= 0:
 			return false
@@ -230,7 +246,7 @@ func perform_action(index: int, action_id: String, target_override = null) -> bo
 		if hero.mana < 5:
 			return false
 		hero.mana -= 5
-		var target = _lowest_health_hero()
+		var target = target_override if target_override != null else _lowest_health_hero()
 		if target == null:
 			_log("%s применяет Быстрое лечение без цели." % hero.name())
 			visual_event.emit({"kind": "quick_heal", "unit": hero, "target": null, "amount": 0, "revived": false})

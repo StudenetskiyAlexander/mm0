@@ -132,6 +132,18 @@ func _activate_action(action_id: String) -> void:
 	var index: int = battle.selected_hero
 	if action_id == "" or not battle.can_hero_act(index):
 		return
+	if action_id == "quick_heal":
+		if battle.available_heal_targets(index).is_empty():
+			return
+		if targeting_action == action_id and targeting_hero_index == index:
+			if battle.perform_action(index, action_id):
+				_cancel_targeting()
+		else:
+			targeting_action = action_id
+			targeting_hero_index = index
+			mouse_default_cursor_shape = Control.CURSOR_CROSS
+		queue_redraw()
+		return
 	if action_id == "melee_attack" or action_id == "shoot" or action_id == "fire_arrow":
 		var targets: Array = battle.available_enemy_targets(index, action_id)
 		if targets.size() > 1:
@@ -169,7 +181,15 @@ func _handle_click(point: Vector2) -> void:
 		_cancel_targeting()
 		log_panel.show()
 		return
-	if targeting_action != "":
+	if targeting_action == "quick_heal":
+		for hero in battle.available_heal_targets(targeting_hero_index):
+			var target_index: int = battle.heroes.find(hero)
+			if _target_hitbox(hero).has_point(point) or _hero_portrait_rect(target_index).has_point(point):
+				if battle.perform_action(targeting_hero_index, targeting_action, hero):
+					_cancel_targeting()
+				queue_redraw()
+				return
+	elif targeting_action != "":
 		for enemy in battle.available_enemy_targets(targeting_hero_index, targeting_action):
 			if _target_hitbox(enemy).has_point(point):
 				if battle.perform_action(targeting_hero_index, targeting_action, enemy):
@@ -183,7 +203,7 @@ func _handle_click(point: Vector2) -> void:
 			return
 	for index in range(battle.heroes.size()):
 		var top := 109.0 + float(index) * 211.0
-		if Rect2(14, top + 9, 192, 139).has_point(point):
+		if _hero_portrait_rect(index).has_point(point):
 			battle.select_hero(index)
 			queue_redraw()
 			return
@@ -237,9 +257,12 @@ func _draw_targeting_markers() -> void:
 	if targeting_action == "" or not battle.can_hero_act(targeting_hero_index):
 		return
 	var mouse_point: Vector2 = get_local_mouse_position()
-	for enemy in battle.available_enemy_targets(targeting_hero_index, targeting_action):
-		var center: Vector2 = _unit_position(enemy)
-		var hovered: bool = _target_hitbox(enemy).has_point(mouse_point)
+	var targets: Array = battle.available_heal_targets(targeting_hero_index) if targeting_action == "quick_heal" else battle.available_enemy_targets(targeting_hero_index, targeting_action)
+	for target in targets:
+		var center: Vector2 = _unit_position(target)
+		var hovered: bool = _target_hitbox(target).has_point(mouse_point)
+		if targeting_action == "quick_heal":
+			hovered = hovered or _hero_portrait_rect(battle.heroes.find(target)).has_point(mouse_point)
 		var color := Color("ffe396") if hovered else Color("8ee6b0")
 		draw_arc(center, 84.0, 0.0, TAU, 48, color, 3.0 if hovered else 2.0, true)
 		draw_circle(center + Vector2(0, 68), 4.0, color)
@@ -251,11 +274,16 @@ func _draw_targeting_markers() -> void:
 	var banner := Rect2(650, 101, 620, 49)
 	draw_rect(banner, Color(0.05, 0.09, 0.08, 0.91), true)
 	draw_rect(banner, Color("8ee6b0"), false, 2.0)
-	_text("ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key, Vector2(664, 131), 16, Color("e3f4df"), 590.0)
+	var prompt := "ВЫБЕРИТЕ ГЕРОЯ  ·  ESC — ОТМЕНА  ·  E — САМЫЙ РАНЕНЫЙ" if targeting_action == "quick_heal" else "ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key
+	_text(prompt, Vector2(664, 131), 16, Color("e3f4df"), 590.0)
 
 
-func _target_hitbox(enemy) -> Rect2:
-	return Rect2(_unit_position(enemy) - Vector2(98, 88), Vector2(196, 176))
+func _target_hitbox(unit) -> Rect2:
+	return Rect2(_unit_position(unit) - Vector2(98, 88), Vector2(196, 176))
+
+
+func _hero_portrait_rect(index: int) -> Rect2:
+	return Rect2(14, 118.0 + float(index) * 211.0, 192, 139)
 
 
 func _draw_animated_unit(unit) -> void:
@@ -550,10 +578,13 @@ func _draw_hero_panel() -> void:
 		var hero = battle.heroes[index]
 		var selected: bool = battle.can_hero_act(index)
 		var edge := Color("f6cf62") if selected else Color("717b7d")
-		var portrait := Rect2(14, top + 9, 192, 139)
+		var portrait := _hero_portrait_rect(index)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
 		_draw_portrait(hero, portrait, index)
+		if targeting_action == "quick_heal" and hero.alive():
+			var hovered: bool = portrait.has_point(get_local_mouse_position())
+			draw_rect(portrait, Color("ffe396") if hovered else Color("8ee6b0"), false, 4.0)
 		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(21, top + 141), 14, Color.WHITE)
 		_draw_resource_bar(Rect2(14, top + 155, 192, 17), hero.health, hero.max_health(), Color("d83834"))
 		_draw_resource_bar(Rect2(14, top + 178, 192, 17), hero.mana, hero.max_mana(), Color("3187dc"))
