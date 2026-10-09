@@ -26,6 +26,7 @@ const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
 const CLASS_NAMES := {"warrior": "Воин", "mage": "Маг", "cleric": "Клирик", "archer": "Лучник"}
 const SLOT_ACTIONS := ["melee_attack", "shoot", "spell", "unused", "health_potion", "mana_potion"]
 const SLOT_KEYS := ["Q", "W", "E", "R", "A", "S"]
+const ANIMATION_ATLAS_WIDTH_SCALE := 1.25
 
 var catalog = CATALOG.new()
 var battle = BATTLE.new()
@@ -327,12 +328,23 @@ func _animation_sheet(unit) -> Texture2D:
 func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 	var unit_id: int = unit.get_instance_id()
 	var fall_row: int = 3 if unit.is_hero and unit.class_id() != "warrior" else 2
-	var row: int = 0
-	var frame: int = 0
+	var idle_row: int = 1
+	var idle_frame: int = 0
+	if unit.is_hero:
+		match unit.class_id():
+			"warrior":
+				idle_frame = 7
+			"cleric", "archer":
+				idle_row = 2
+	elif unit.id() == "forest_wolf":
+		idle_row = 2
+	var row: int = idle_row
+	var frame: int = idle_frame
 	var tint: Color = Color.WHITE
 	if movement_animations.has(unit_id):
 		var movement: Dictionary = movement_animations[unit_id]
 		var step: float = clampf(float(movement["elapsed"]) / float(movement["duration"]), 0.0, 1.0)
+		row = 0
 		frame = clampi(int(step * 8.0), 0, 7)
 	if action_animations.has(unit_id):
 		var action: Dictionary = action_animations[unit_id]
@@ -362,8 +374,8 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 			var fall: Dictionary = fall_animations[unit_id]
 			var fall_phase: float = float(fall["elapsed"]) / float(fall["duration"])
 			if fall_phase < 0.0:
-				row = 0
-				frame = 0
+				row = idle_row
+				frame = idle_frame
 			else:
 				frame = clampi(int(fall_phase * 8.0), 0, 7)
 		if frame == 7:
@@ -373,8 +385,8 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		var death_phase: float = float(death["elapsed"]) / float(death["duration"])
 		row = fall_row
 		if death_phase < 0.0:
-			row = 0
-			frame = 0
+			row = idle_row
+			frame = idle_frame
 		else:
 			frame = clampi(int(death_phase * 8.0), 0, 7)
 			tint.a = 1.0 - clampf((death_phase - 0.7) / 0.3, 0.0, 1.0)
@@ -384,6 +396,7 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 	var size := Vector2(170, 170) if unit.is_hero else Vector2(168, 168)
 	if not unit.is_hero and unit.id() == "forest_wolf":
 		size = Vector2(194, 160)
+	size.x *= ANIMATION_ATLAS_WIDTH_SCALE
 	var center: Vector2 = _unit_position(unit)
 	var destination := Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size)
 	_draw_sprite_frame(sheet, destination, frame, row, fall_row + 1, tint)

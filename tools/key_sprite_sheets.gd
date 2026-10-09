@@ -5,6 +5,7 @@ extends SceneTree
 const UNITS := ["warrior", "mage", "cleric", "archer", "small-goblin", "armored-goblin", "wolf"]
 const COLUMNS := 8
 const MIN_SILHOUETTE_PIXELS := 3000
+const ATLAS_WIDTH_SCALE := 1.25
 
 
 func _init() -> void:
@@ -60,8 +61,12 @@ func _key_green(image: Image) -> void:
 func _pack_frames(source: Image, rows: int) -> Image:
 	var width: int = source.get_width()
 	var height: int = source.get_height()
-	var result: Image = Image.create_empty(width, height, false, Image.FORMAT_RGBA8)
+	var result_width: int = roundi(width * ATLAS_WIDTH_SCALE)
+	var result: Image = Image.create_empty(result_width, height, false, Image.FORMAT_RGBA8)
 	result.fill(Color.TRANSPARENT)
+	var row_data: Array[Dictionary] = []
+	var widest_standing_pose: int = 1
+	var tallest_standing_pose: int = 1
 	for row in range(rows):
 		var top: int = roundi(float(row * height) / rows)
 		var bottom: int = roundi(float((row + 1) * height) / rows)
@@ -120,13 +125,25 @@ func _pack_frames(source: Image, rows: int) -> Image:
 			for column in range(COLUMNS):
 				if slots[column].is_empty() and not poses.is_empty():
 					slots[column] = poses[clampi(column, 0, poses.size() - 1)]
+		if row < rows - 1:
+			for pose in slots:
+				if not pose.is_empty():
+					widest_standing_pose = maxi(widest_standing_pose, int(pose["right"]) - int(pose["left"]) + 5)
+					tallest_standing_pose = maxi(tallest_standing_pose, int(pose["bottom"]) - int(pose["top"]) + 5)
+		row_data.append({"top": top, "bottom": bottom, "labels": labels, "slots": slots})
+	var cell_width: float = float(result_width) / COLUMNS
+	var cell_height: float = float(height) / rows
+	var standing_scale: float = minf(cell_width * 0.88 / widest_standing_pose, cell_height * 0.86 / tallest_standing_pose)
+	for row in range(rows):
+		var data: Dictionary = row_data[row]
+		var slots: Array[Dictionary] = data["slots"]
 		for column in range(COLUMNS):
 			if not slots[column].is_empty():
-				_place_pose(source, result, labels, width, top, bottom, column, slots[column])
+				_place_pose(source, result, data["labels"], width, int(data["top"]), int(data["bottom"]), column, slots[column], standing_scale)
 	return result
 
 
-func _place_pose(source: Image, result: Image, labels: PackedInt32Array, width: int, top: int, bottom: int, column: int, pose: Dictionary) -> void:
+func _place_pose(source: Image, result: Image, labels: PackedInt32Array, width: int, top: int, bottom: int, column: int, pose: Dictionary, standing_scale: float) -> void:
 	var min_x: int = maxi(0, int(pose["left"]) - 2)
 	var max_x: int = mini(width - 1, int(pose["right"]) + 2)
 	var min_y: int = maxi(0, int(pose["top"]) - 2)
@@ -147,11 +164,11 @@ func _place_pose(source: Image, result: Image, labels: PackedInt32Array, width: 
 							belongs = true
 			if belongs:
 				cutout.set_pixel(x - min_x, y - min_y, source.get_pixel(x, top + y))
-	var cell_left: int = roundi(float(column * width) / COLUMNS)
-	var cell_right: int = roundi(float((column + 1) * width) / COLUMNS)
+	var cell_left: int = roundi(float(column * result.get_width()) / COLUMNS)
+	var cell_right: int = roundi(float((column + 1) * result.get_width()) / COLUMNS)
 	var cell_width: int = cell_right - cell_left
 	var cell_height: int = bottom - top
-	var scale: float = minf(float(cell_width) * 0.82 / cutout.get_width(), float(cell_height) * 0.86 / cutout.get_height())
+	var scale: float = minf(standing_scale, minf(float(cell_width) * 0.88 / cutout.get_width(), float(cell_height) * 0.86 / cutout.get_height()))
 	var new_width: int = maxi(1, roundi(cutout.get_width() * scale))
 	var new_height: int = maxi(1, roundi(cutout.get_height() * scale))
 	cutout.resize(new_width, new_height, Image.INTERPOLATE_BILINEAR)
