@@ -7,6 +7,8 @@ const IDLE_UNITS := ["mage", "archer"]
 const COLUMNS := 8
 const MIN_SILHOUETTE_PIXELS := 3000
 const ATLAS_WIDTH_SCALE := 1.25
+const IDLE_HEIGHT_RATIOS := {"mage": 0.81, "archer": 0.78}
+const IDLE_WIDTH_SCALE := 1.30
 
 
 func _init() -> void:
@@ -63,8 +65,9 @@ func _create_idle_frame(unit_id: String) -> bool:
 		return false
 	var cutout: Image = source.get_region(Rect2i(left, top, right - left + 1, bottom - top + 1))
 	var frame_size := Vector2i(roundi(float(atlas.get_width()) / COLUMNS), roundi(float(atlas.get_height()) / 4.0))
-	var scale: float = minf(float(frame_size.x) * 0.86 / cutout.get_width(), float(frame_size.y) * 0.74 / cutout.get_height())
-	cutout.resize(roundi(cutout.get_width() * scale), roundi(cutout.get_height() * scale), Image.INTERPOLATE_BILINEAR)
+	var target_height: int = roundi(frame_size.y * float(IDLE_HEIGHT_RATIOS[unit_id]))
+	var target_width: int = roundi(float(cutout.get_width()) * target_height / cutout.get_height() * IDLE_WIDTH_SCALE)
+	cutout.resize(target_width, target_height, Image.INTERPOLATE_BILINEAR)
 	var result: Image = Image.create_empty(frame_size.x, frame_size.y, false, Image.FORMAT_RGBA8)
 	result.fill(Color.TRANSPARENT)
 	var position := Vector2i((frame_size.x - cutout.get_width()) / 2, roundi(frame_size.y * 0.95) - cutout.get_height())
