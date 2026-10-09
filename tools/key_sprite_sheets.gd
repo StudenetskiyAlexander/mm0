@@ -2,7 +2,7 @@ extends SceneTree
 
 # Generated poses may cross nominal column edges. Extract each connected
 # silhouette, then place it inside one cell with a guaranteed transparent gutter.
-const UNITS := ["warrior", "mage", "cleric", "archer", "small-goblin", "armored-goblin", "wolf"]
+const UNITS := ["warrior", "mage", "cleric", "cleric-female", "archer", "small-goblin", "armored-goblin", "wolf"]
 const COLUMNS := 8
 const MIN_SILHOUETTE_PIXELS := 3000
 const ATLAS_WIDTH_SCALE := 1.25
