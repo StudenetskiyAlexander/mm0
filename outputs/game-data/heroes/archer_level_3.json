@@ -37,7 +37,9 @@
   },
   "actions": [
     "melee_attack",
-    "shoot"
+    "shoot",
+    "fire_arrow",
+    "quick_heal"
   ],
   "potions": {
     "health": 1,

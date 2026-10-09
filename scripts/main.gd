@@ -7,14 +7,18 @@ const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-8f.png")
+const WARRIOR_ABILITIES: Texture2D = preload("res://assets/ability_animation/warrior-abilities-packed.png")
 const WARRIOR_TARGET_MASK: Texture2D = preload("res://assets/warrior-target-mask-8f.png")
 const MAGE_ANIMATION: Texture2D = preload("res://assets/mage-animation-8f.png")
+const MAGE_ABILITIES: Texture2D = preload("res://assets/ability_animation/mage-abilities-packed.png")
 const MAGE_TARGET_MASK: Texture2D = preload("res://assets/mage-target-mask-8f.png")
 const MAGE_IDLE: Texture2D = preload("res://assets/mage-idle.png")
 const MAGE_IDLE_MASK: Texture2D = preload("res://assets/mage-idle-mask.png")
 const CLERIC_ANIMATION: Texture2D = preload("res://assets/cleric-animation-8f.png")
+const CLERIC_ABILITIES: Texture2D = preload("res://assets/ability_animation/cleric-abilities-packed.png")
 const CLERIC_TARGET_MASK: Texture2D = preload("res://assets/cleric-target-mask-8f.png")
 const ARCHER_ANIMATION: Texture2D = preload("res://assets/archer-animation-8f.png")
+const ARCHER_ABILITIES: Texture2D = preload("res://assets/ability_animation/archer-abilities-packed.png")
 const ARCHER_TARGET_MASK: Texture2D = preload("res://assets/archer-target-mask-8f.png")
 const ARCHER_IDLE: Texture2D = preload("res://assets/archer-idle.png")
 const ARCHER_IDLE_MASK: Texture2D = preload("res://assets/archer-idle-mask.png")
@@ -134,6 +138,9 @@ func _handle_key(event: InputEventKey) -> void:
 	elif key == KEY_E:
 		if battle.selected_hero >= 0:
 			_activate_action(_spell_for(battle.heroes[battle.selected_hero]))
+	elif key == KEY_R:
+		if battle.selected_hero >= 0:
+			_activate_action(_support_spell_for(battle.heroes[battle.selected_hero]))
 	elif key == KEY_A:
 		_activate_action("health_potion")
 	elif key == KEY_S:
@@ -280,10 +287,14 @@ func _draw_targeting_banner() -> void:
 		key = "Q"
 	elif targeting_action == "shoot":
 		key = "W"
+	elif targeting_action == "quick_heal" and _slot_action_id(battle.heroes[targeting_hero_index], 3) == "quick_heal":
+		key = "R"
 	var banner := Rect2(650, 101, 620, 49)
 	draw_rect(banner, Color(0.05, 0.09, 0.08, 0.91), true)
 	draw_rect(banner, Color("8ee6b0") if targeting_action == "quick_heal" else Color("e6b974"), false, 2.0)
-	var prompt := "ВЫБЕРИТЕ ГЕРОЯ  ·  ESC — ОТМЕНА  ·  E — САМЫЙ РАНЕНЫЙ" if targeting_action == "quick_heal" else "ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key
+	var prompt: String = "ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key
+	if targeting_action == "quick_heal":
+		prompt = "ВЫБЕРИТЕ ГЕРОЯ  ·  ESC — ОТМЕНА  ·  %s — САМЫЙ РАНЕНЫЙ" % key
 	_text(prompt, Vector2(664, 131), 16, Color("e3f4df"), 590.0)
 
 
@@ -333,6 +344,30 @@ func _animation_sheet(unit) -> Texture2D:
 			"forest_wolf":
 				return WOLF_ANIMATION
 	return null
+
+
+func _ability_animation(class_id: String, action_kind: String) -> Dictionary:
+	# Each class keeps its original attack and signature ability frames. The
+	# supplemental sheets cover the other ability types at eight frames each.
+	match class_id:
+		"warrior":
+			match action_kind:
+				"shoot": return {"sheet": WARRIOR_ABILITIES, "row": 0, "rows": 3}
+				"fire_arrow", "enemy_magic": return {"sheet": WARRIOR_ABILITIES, "row": 1, "rows": 3}
+				"quick_heal", "ally_magic": return {"sheet": WARRIOR_ABILITIES, "row": 2, "rows": 3}
+		"mage":
+			match action_kind:
+				"shoot": return {"sheet": MAGE_ABILITIES, "row": 0, "rows": 2}
+				"quick_heal", "ally_magic": return {"sheet": MAGE_ABILITIES, "row": 1, "rows": 2}
+		"cleric":
+			match action_kind:
+				"shoot": return {"sheet": CLERIC_ABILITIES, "row": 0, "rows": 2}
+				"fire_arrow", "enemy_magic": return {"sheet": CLERIC_ABILITIES, "row": 1, "rows": 2}
+		"archer":
+			match action_kind:
+				"fire_arrow", "enemy_magic": return {"sheet": ARCHER_ABILITIES, "row": 0, "rows": 2}
+				"quick_heal", "ally_magic": return {"sheet": ARCHER_ABILITIES, "row": 1, "rows": 2}
+	return {}
 
 
 func _target_mask_sheet(unit) -> Texture2D:
@@ -391,6 +426,8 @@ func _draw_target_outline(mask: Texture2D, destination: Rect2, column: int, row:
 func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 	var unit_id: int = unit.get_instance_id()
 	var fall_row: int = 3 if unit.is_hero and unit.class_id() != "warrior" else 2
+	var base_sheet: Texture2D = sheet
+	var sheet_rows: int = fall_row + 1
 	var idle_row: int = 1
 	var idle_frame: int = 0
 	if unit.is_hero:
@@ -416,9 +453,15 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 			"melee":
 				row = 1
 				frame = clampi(int(phase * 8.0), 0, 7)
-			"shoot", "fire_arrow", "quick_heal":
+			"shoot", "fire_arrow", "quick_heal", "enemy_magic", "ally_magic":
 				if unit.is_hero:
-					row = 2
+					var ability: Dictionary = _ability_animation(unit.class_id(), str(action["kind"]))
+					if ability.is_empty():
+						row = 2
+					else:
+						sheet = ability["sheet"] as Texture2D
+						row = int(ability["row"])
+						sheet_rows = int(ability["rows"])
 					frame = clampi(int(phase * 8.0), 0, 7)
 			"recover":
 				row = fall_row
@@ -427,10 +470,14 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		var impact: Dictionary = impact_animations[unit_id]
 		var impact_phase: float = float(impact["elapsed"]) / float(impact["duration"])
 		if impact_phase >= 0.0 and impact_phase < 1.0:
+			sheet = base_sheet
+			sheet_rows = fall_row + 1
 			row = fall_row
 			frame = clampi(int(impact_phase * 8.0), 0, 7)
 			tint = Color(1.0, 0.68, 0.68)
 	if unit.is_hero and not unit.conscious():
+		sheet = base_sheet
+		sheet_rows = fall_row + 1
 		row = fall_row
 		frame = 7
 		if fall_animations.has(unit_id):
@@ -444,6 +491,8 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		if frame == 7:
 			tint = Color(0.6, 0.6, 0.64, 0.9)
 	if death_animations.has(unit_id):
+		sheet = base_sheet
+		sheet_rows = fall_row + 1
 		var death: Dictionary = death_animations[unit_id]
 		var death_phase: float = float(death["elapsed"]) / float(death["duration"])
 		row = fall_row
@@ -466,7 +515,7 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 	size.x *= ANIMATION_ATLAS_WIDTH_SCALE
 	var center: Vector2 = _unit_position(unit)
 	var bottom_y: float = center.y + size.y * 0.44
-	if unit.is_hero and unit.class_id() == "cleric":
+	if unit.is_hero and unit.class_id() == "cleric" and sheet == base_sheet:
 		if row == 1:
 			size *= float(CLERIC_MELEE_FRAME_SCALES[frame])
 		elif row == 2:
@@ -483,13 +532,13 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		elif use_standing_sprite and unit.class_id() == "archer":
 			mask = ARCHER_IDLE_MASK
 			idle_mask = true
-		_draw_target_outline(mask, destination, frame, row, fall_row + 1, idle_mask, outline_strength)
+		_draw_target_outline(mask, destination, frame, row, sheet_rows, idle_mask, outline_strength)
 	if use_standing_sprite and unit.class_id() == "mage":
 		draw_texture_rect(MAGE_IDLE, destination, false, tint)
 	elif use_standing_sprite and unit.class_id() == "archer":
 		draw_texture_rect(ARCHER_IDLE, destination, false, tint)
 	else:
-		_draw_sprite_frame(sheet, destination, frame, row, fall_row + 1, tint)
+		_draw_sprite_frame(sheet, destination, frame, row, sheet_rows, tint)
 	if not unit.is_hero and unit.conscious():
 		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
 		var is_goblin: bool = unit.id() == "small_goblin" or unit.id() == "armored_goblin"
@@ -772,7 +821,7 @@ func _slot_action_id(hero, slot: int) -> String:
 	if slot == 2:
 		return _spell_for(hero)
 	if slot == 3:
-		return ""
+		return _support_spell_for(hero)
 	return SLOT_ACTIONS[slot]
 
 
@@ -780,6 +829,14 @@ func _spell_for(hero) -> String:
 	if hero.has_action("fire_arrow"):
 		return "fire_arrow"
 	if hero.has_action("quick_heal"):
+		return "quick_heal"
+	return ""
+
+
+func _support_spell_for(hero) -> String:
+	# Keep E as the cleric's heal when it is their only spell. Heroes with both
+	# spells receive the second one on R.
+	if hero.has_action("fire_arrow") and hero.has_action("quick_heal"):
 		return "quick_heal"
 	return ""
 
@@ -821,7 +878,11 @@ func _draw_action_slot(hero, top: float, slot: int) -> void:
 				_draw_heal_icon(center, available)
 			else:
 				_draw_empty_icon(center)
-		3: _draw_empty_icon(center)
+		3:
+			if _slot_action_id(hero, slot) == "quick_heal":
+				_draw_heal_icon(center, available)
+			else:
+				_draw_empty_icon(center)
 		4: _draw_potion_icon(center, Color("cc493e"), available)
 		5: _draw_potion_icon(center, Color("338fd0"), available)
 	var badge_center: Vector2 = rect.position + Vector2(rect.size.x - 9, 8)
@@ -959,10 +1020,13 @@ func _build_setup_overlay() -> void:
 		row.add_child(check)
 		hero_checks[class_id] = check
 		var levels := OptionButton.new()
-		levels.custom_minimum_size = Vector2(170, 42)
+		levels.custom_minimum_size = Vector2(260, 42)
 		for level in [1, 3, 5]:
 			if not catalog.hero_profile(class_id, level).is_empty():
-				levels.add_item("%d уровень" % level, level)
+				var level_name: String = "%d уровень" % level
+				if level == 3:
+					level_name += " · все действия"
+				levels.add_item(level_name, level)
 		levels.select(0)
 		row.add_child(levels)
 		hero_levels[class_id] = levels
@@ -1175,12 +1239,13 @@ func _on_visual_event(event: Dictionary) -> void:
 		var toward_target: Vector2 = (destination - origin).normalized()
 		if toward_target != Vector2.ZERO:
 			direction = toward_target
+	var animation_kind: String = str(event.get("animation_type", kind))
 	var action_duration := 0.44
-	if kind == "shoot" or kind == "fire_arrow":
+	if animation_kind == "shoot" or animation_kind == "fire_arrow" or animation_kind == "enemy_magic":
 		action_duration = 0.56
-	elif kind == "quick_heal":
+	elif animation_kind == "quick_heal" or animation_kind == "ally_magic":
 		action_duration = 0.52
-	action_animations[unit_id] = {"kind": kind, "direction": direction, "elapsed": 0.0, "duration": action_duration}
+	action_animations[unit_id] = {"kind": animation_kind, "direction": direction, "elapsed": 0.0, "duration": action_duration}
 	if unit.is_hero:
 		var action_frame: int = 5 if (kind == "health_potion" or kind == "mana_potion") and int(event.get("amount", 0)) > 0 else 3
 		portrait_reactions[unit_id] = {"frame": action_frame, "elapsed": 0.0, "duration": action_duration + 0.14}

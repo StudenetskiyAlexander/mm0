@@ -39,5 +39,13 @@
   "potions": {
     "health": 1,
     "mana": 1
+  },
+  "ranged_weapon": {
+    "name": "Короткий лук",
+    "attack_type": "ranged",
+    "skill_id": "bow",
+    "minimum_attack_range_cells": 2,
+    "damage_dice": "1d6",
+    "accuracy_bonus": 0
   }
 }
