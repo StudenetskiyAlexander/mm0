@@ -29,6 +29,10 @@ const SLOT_KEYS := ["Q", "W", "E", "R", "A", "S"]
 const ANIMATION_ATLAS_WIDTH_SCALE := 1.25
 const HERO_BATTLE_SPRITE_SCALE := 1.10
 const GOBLIN_BATTLE_SPRITE_SCALE := 0.85
+# The generated cleric poses have different body sizes around the raised mace
+# and healing glow. Keep his apparent height steady without cropping those effects.
+const CLERIC_MELEE_FRAME_SCALES := [1.0, 1.05, 1.13, 1.22, 1.20, 1.22, 1.08, 1.0]
+const CLERIC_HEAL_FRAME_SCALES := [1.0, 1.12, 1.19, 1.22, 1.20, 1.20, 1.10, 1.0]
 
 var catalog = CATALOG.new()
 var battle = BATTLE.new()
@@ -404,7 +408,13 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		size *= GOBLIN_BATTLE_SPRITE_SCALE
 	size.x *= ANIMATION_ATLAS_WIDTH_SCALE
 	var center: Vector2 = _unit_position(unit)
-	var destination := Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size)
+	var bottom_y: float = center.y + size.y * 0.44
+	if unit.is_hero and unit.class_id() == "cleric":
+		if row == 1:
+			size *= float(CLERIC_MELEE_FRAME_SCALES[frame])
+		elif row == 2:
+			size *= float(CLERIC_HEAL_FRAME_SCALES[frame])
+	var destination := Rect2(Vector2(center.x - size.x * 0.5, bottom_y - size.y), size)
 	_draw_sprite_frame(sheet, destination, frame, row, fall_row + 1, tint)
 	if not unit.is_hero and unit.conscious():
 		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
