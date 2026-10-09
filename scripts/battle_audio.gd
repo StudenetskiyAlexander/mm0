@@ -1,6 +1,6 @@
 extends Node
 
-const BOARD = preload("res://scripts/hex_board.gd")
+const BOARD = preload("res://scripts/battle_board.gd")
 const BATTLE_THEME: AudioStreamWAV = preload("res://assets/audio/battle-theme.wav")
 const SOUNDS := {
 	"sword_swing": preload("res://assets/audio/sword_swing.wav"),

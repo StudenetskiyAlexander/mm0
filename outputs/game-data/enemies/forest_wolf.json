@@ -20,12 +20,12 @@
   "unspent_skill_points": 0,
   "armor": null,
   "defense_equipment_bonus": 0,
-  "movement_speed_hexes_per_second": 1.5,
+  "movement_speed_cells_per_second": 1.5,
   "weapon": {
     "name": "Клыки",
     "attack_type": "melee",
     "skill_id": "bite",
-    "attack_range_hexes": 1,
+    "attack_range_cells": 1,
     "damage_dice": "1d4",
     "accuracy_bonus": 0
   }

@@ -1,6 +1,6 @@
 extends Control
 
-const BOARD = preload("res://scripts/hex_board.gd")
+const BOARD = preload("res://scripts/battle_board.gd")
 const CATALOG = preload("res://scripts/data_catalog.gd")
 const BATTLE = preload("res://scripts/battle_state.gd")
 const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
@@ -127,7 +127,7 @@ func _handle_click(point: Vector2) -> void:
 		log_panel.show()
 		return
 	for index in range(battle.heroes.size()):
-		if point.distance_to(BOARD.center(battle.heroes[index].cell)) <= BOARD.RADIUS:
+		if BOARD.cell_rect(battle.heroes[index].cell).has_point(point):
 			battle.select_hero(index)
 			queue_redraw()
 			return
@@ -179,11 +179,10 @@ func _draw_board() -> void:
 	for row in range(BOARD.ROWS):
 		for column in range(BOARD.COLUMNS):
 			var cell := Vector2i(column, row)
-			var points: PackedVector2Array = BOARD.corners(cell)
-			draw_colored_polygon(points, Color(0.43, 0.35, 0.16, 0.06))
-			var outline := points.duplicate()
-			outline.append(points[0])
-			draw_polyline(outline, Color(0.89, 0.83, 0.58, 0.78), 2.0, true)
+			var rect: Rect2 = BOARD.cell_rect(cell)
+			var shade := 0.12 if (row + column) % 2 == 0 else 0.08
+			draw_rect(rect, Color(0.26, 0.21, 0.10, shade), true)
+			draw_rect(rect, Color(0.95, 0.86, 0.63, 0.82), false, 2.0)
 
 
 func _draw_units() -> void:
@@ -326,11 +325,9 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 
 
 func _draw_cell_frame(cell: Vector2i, color: Color, selected: bool) -> void:
-	var corners: PackedVector2Array = BOARD.corners(cell)
-	draw_colored_polygon(corners, Color(color.r, color.g, color.b, 0.18 if selected else 0.09))
-	var outline := corners.duplicate()
-	outline.append(corners[0])
-	draw_polyline(outline, color, 5.0 if selected else 3.0, true)
+	var rect: Rect2 = BOARD.cell_rect(cell).grow(-4.0)
+	draw_rect(rect, Color(color.r, color.g, color.b, 0.18 if selected else 0.09), true)
+	draw_rect(rect, color, false, 5.0 if selected else 3.0)
 
 
 func _draw_hero_sprite(hero, center: Vector2, tint: Color) -> void:

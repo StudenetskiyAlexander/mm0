@@ -4,7 +4,7 @@ signal event_logged(message: String)
 signal battle_ended(victory: bool)
 signal visual_event(event: Dictionary)
 
-const BOARD = preload("res://scripts/hex_board.gd")
+const BOARD = preload("res://scripts/battle_board.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
 const PROJECTILE_LAUNCH_DELAY := 0.32
 const ACTION_ANIMATION_TIME := 0.55
@@ -163,7 +163,7 @@ func perform_action(index: int, action_id: String) -> bool:
 	elif action_id == "shoot":
 		if not can_shoot(hero):
 			return false
-		var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_hexes", 2))
+		var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_cells", 2))
 		var target = _nearest_enemy(hero.cell, minimum_range, -1)
 		if target == null:
 			_log("%s выпускает стрелу, но подходящей цели нет." % hero.name())
@@ -214,8 +214,8 @@ func _update_enemy(enemy) -> void:
 	if target == null:
 		return
 	var weapon: Dictionary = enemy.weapon()
-	var attack_range := int(weapon.get("attack_range_hexes", 1))
-	if BOARD.distance(enemy.cell, target.cell) <= attack_range:
+	var attack_range := int(weapon.get("attack_range_cells", 1))
+	if BOARD.attack_distance(enemy.cell, target.cell) <= attack_range:
 		_physical_attack(enemy, target, false)
 		turn_delay = ACTION_ANIMATION_TIME
 		return
@@ -227,7 +227,7 @@ func _update_enemy(enemy) -> void:
 		visual_event.emit({"kind": "move", "unit": enemy, "from_cell": enemy.cell, "to_cell": next_cell, "speed": float(ENEMY_MOVE_CELLS_PER_TURN)})
 		enemy.cell = next_cell
 		steps += 1
-		if BOARD.distance(enemy.cell, target.cell) <= attack_range:
+		if BOARD.attack_distance(enemy.cell, target.cell) <= attack_range:
 			break
 	if steps > 0:
 		_log("%s перемещается на %d клет." % [enemy.name(), steps])
@@ -236,11 +236,10 @@ func _update_enemy(enemy) -> void:
 
 func _spawn_enemy() -> bool:
 	var free_cells: Array[Vector2i] = []
-	for column in range(BOARD.COLUMNS - 3, BOARD.COLUMNS):
-		for row in range(BOARD.ROWS):
-			var cell := Vector2i(column, row)
-			if not _occupied(cell):
-				free_cells.append(cell)
+	for row in range(BOARD.ROWS):
+		var cell := Vector2i(BOARD.COLUMNS - 1, row)
+		if not _occupied(cell):
+			free_cells.append(cell)
 	if free_cells.is_empty():
 		return false
 	var cell := free_cells[rng.randi_range(0, free_cells.size() - 1)]
@@ -267,7 +266,7 @@ func _nearest_hero(from_cell: Vector2i):
 	for hero in heroes:
 		if not hero.conscious():
 			continue
-		var distance: int = BOARD.distance(from_cell, hero.cell)
+		var distance: int = BOARD.attack_distance(from_cell, hero.cell)
 		if distance < best_distance:
 			best_distance = distance
 			closest = [hero]
@@ -284,7 +283,7 @@ func _nearest_enemy(from_cell: Vector2i, minimum_range: int, maximum_range: int)
 	for enemy in enemies:
 		if not enemy.conscious():
 			continue
-		var distance: int = BOARD.distance(from_cell, enemy.cell)
+		var distance: int = BOARD.attack_distance(from_cell, enemy.cell)
 		if distance < minimum_range or (maximum_range >= 0 and distance > maximum_range):
 			continue
 		if distance < best_distance:
@@ -298,9 +297,9 @@ func _nearest_enemy(from_cell: Vector2i, minimum_range: int, maximum_range: int)
 
 
 func can_shoot(hero) -> bool:
-	var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_hexes", 2))
+	var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_cells", 2))
 	for enemy in enemies:
-		if enemy.conscious() and BOARD.distance(hero.cell, enemy.cell) < minimum_range:
+		if enemy.conscious() and BOARD.attack_distance(hero.cell, enemy.cell) < minimum_range:
 			return false
 	return true
 
@@ -329,7 +328,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var skill_name := str(weapon.get("skill_id", ""))
 	var skill_value: int = attacker.skill(skill_name)
 	var weapon_bonus := int(weapon.get("accuracy_bonus", 0))
-	var distance: int = BOARD.distance(attacker.cell, target.cell)
+	var distance: int = BOARD.attack_distance(attacker.cell, target.cell)
 	var range_penalty: int = maxi(0, distance - 5) * 3 if ranged else 0
 	var die := rng.randi_range(1, 20)
 	var attack_total := attribute_value + skill_value + weapon_bonus + die - range_penalty
@@ -469,17 +468,17 @@ func _next_step(start_cell: Vector2i, target_cell: Vector2i, attack_range: int) 
 	var goal := Vector2i(-1, -1)
 	while not frontier.is_empty():
 		var current: Vector2i = frontier.pop_front()
-		if current != start_cell and BOARD.distance(current, target_cell) <= attack_range:
+		if current != start_cell and BOARD.attack_distance(current, target_cell) <= attack_range:
 			goal = current
 			break
 		var candidates: Array[Vector2i] = BOARD.neighbors(current)
 		candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-			var a_score: int = BOARD.distance(a, target_cell) * 10 + absi(a.y - target_cell.y)
-			var b_score: int = BOARD.distance(b, target_cell) * 10 + absi(b.y - target_cell.y)
+			var a_score: int = BOARD.attack_distance(a, target_cell) * 10 + absi(a.y - start_cell.y)
+			var b_score: int = BOARD.attack_distance(b, target_cell) * 10 + absi(b.y - start_cell.y)
 			return a_score < b_score
 		)
 		for neighbor in candidates:
-			if visited.has(neighbor) or _occupied(neighbor):
+			if neighbor.x == 0 or visited.has(neighbor) or _occupied(neighbor):
 				continue
 			visited[neighbor] = true
 			previous[neighbor] = current

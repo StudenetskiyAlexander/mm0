@@ -24,7 +24,7 @@
     "name": "Нож",
     "attack_type": "melee",
     "skill_id": "knife",
-    "attack_range_hexes": 1,
+    "attack_range_cells": 1,
     "damage_dice": "1d6",
     "accuracy_bonus": 0
   }
