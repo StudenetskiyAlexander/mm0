@@ -51,12 +51,16 @@ var visual_effects: Array[Dictionary] = []
 var targeting_action := ""
 var targeting_hero_index := -1
 var wolf_animation: Texture2D
+var cleric_animation: Texture2D
+var archer_animation: Texture2D
 var battle_audio
 
 
 func _ready() -> void:
 	font = get_theme_default_font()
 	wolf_animation = _prepare_wolf_animation()
+	cleric_animation = _remove_red_fringe(CLERIC_ANIMATION)
+	archer_animation = _remove_red_fringe(ARCHER_ANIMATION)
 	battle_audio = BATTLE_AUDIO.new()
 	add_child(battle_audio)
 	catalog.load_all()
@@ -312,9 +316,9 @@ func _animation_sheet(unit) -> Texture2D:
 			"mage":
 				return MAGE_ANIMATION
 			"cleric":
-				return CLERIC_ANIMATION
+				return cleric_animation
 			"archer":
-				return ARCHER_ANIMATION
+				return archer_animation
 	else:
 		match unit.id():
 			"small_goblin":
@@ -339,75 +343,109 @@ func _prepare_wolf_animation() -> Texture2D:
 	return ImageTexture.create_from_image(pixels)
 
 
+func _remove_red_fringe(source: Texture2D) -> Texture2D:
+	var pixels: Image = source.get_image()
+	pixels.convert(Image.FORMAT_RGBA8)
+	for y in range(pixels.get_height()):
+		for x in range(pixels.get_width()):
+			var color: Color = pixels.get_pixel(x, y)
+			if color.a > 0.0 and color.r > 0.8 and color.g < 0.25 and color.b < 0.18:
+				color.a = 0.0
+				pixels.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(pixels)
+
+
 func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 	var unit_id: int = unit.get_instance_id()
 	var fall_row: int = 3 if unit.is_hero and unit.class_id() != "warrior" else 2
 	var row: int = 0
-	var column: int = 0
+	var frame: int = 0
+	var loop_frames := false
 	var tint: Color = Color.WHITE
 	if movement_animations.has(unit_id):
 		var movement: Dictionary = movement_animations[unit_id]
 		var step: float = clampf(float(movement["elapsed"]) / float(movement["duration"]), 0.0, 1.0)
-		column = clampi(int(step * 4.0), 0, 3)
+		frame = clampi(int(step * 8.0), 0, 7)
+		loop_frames = true
 	if action_animations.has(unit_id):
 		var action: Dictionary = action_animations[unit_id]
 		var phase: float = clampf(float(action["elapsed"]) / float(action["duration"]), 0.0, 1.0)
 		match str(action["kind"]):
 			"melee":
 				row = 1
-				column = clampi(int(phase * 4.0), 0, 3)
+				frame = clampi(int(phase * 8.0), 0, 7)
+				loop_frames = false
 			"shoot", "fire_arrow", "quick_heal":
 				if unit.is_hero:
 					row = 2
-					column = clampi(int(phase * 4.0), 0, 3)
+					frame = clampi(int(phase * 8.0), 0, 7)
+					loop_frames = false
 			"recover":
 				row = fall_row
-				column = 3 - clampi(int(phase * 4.0), 0, 3)
+				frame = 7 - clampi(int(phase * 8.0), 0, 7)
+				loop_frames = false
 	if impact_animations.has(unit_id):
 		var impact: Dictionary = impact_animations[unit_id]
 		var impact_phase: float = float(impact["elapsed"]) / float(impact["duration"])
 		if impact_phase >= 0.0 and impact_phase < 1.0:
 			row = fall_row
-			column = 0 if impact_phase < 0.5 else 1
+			frame = clampi(int(impact_phase * 4.0), 0, 3)
+			loop_frames = false
 			tint = Color(1.0, 0.68, 0.68)
 	if unit.is_hero and not unit.conscious():
 		row = fall_row
-		column = 3
+		frame = 6
+		loop_frames = false
 		if fall_animations.has(unit_id):
 			var fall: Dictionary = fall_animations[unit_id]
 			var fall_phase: float = float(fall["elapsed"]) / float(fall["duration"])
 			if fall_phase < 0.0:
 				row = 0
-				column = 0
+				frame = 0
 			else:
-				column = clampi(int(fall_phase * 4.0), 0, 3)
-		if column == 3:
+				frame = clampi(int(fall_phase * 8.0), 0, 7)
+		if frame >= 6:
 			tint = Color(0.6, 0.6, 0.64, 0.9)
 	if death_animations.has(unit_id):
 		var death: Dictionary = death_animations[unit_id]
 		var death_phase: float = float(death["elapsed"]) / float(death["duration"])
 		row = fall_row
+		loop_frames = false
 		if death_phase < 0.0:
 			row = 0
-			column = 0
+			frame = 0
 		else:
-			column = clampi(int(death_phase * 4.0), 0, 3)
+			frame = clampi(int(death_phase * 8.0), 0, 7)
 			tint.a = 1.0 - clampf((death_phase - 0.7) / 0.3, 0.0, 1.0)
 	if spawn_animations.has(unit_id):
 		var spawn: Dictionary = spawn_animations[unit_id]
 		tint.a *= clampf(float(spawn["elapsed"]) / float(spawn["duration"]), 0.0, 1.0)
-	var frame_width: float = float(sheet.get_width()) / 4.0
-	var frame_height: float = float(sheet.get_height()) / float(fall_row + 1)
-	var source := Rect2(float(column) * frame_width, float(row) * frame_height, frame_width, frame_height)
 	var size := Vector2(170, 170) if unit.is_hero else Vector2(168, 168)
 	if not unit.is_hero and unit.id() == "forest_wolf":
 		size = Vector2(194, 160)
 	var center: Vector2 = _unit_position(unit)
-	draw_texture_rect_region(sheet, Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size), source, tint)
+	var destination := Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size)
+	var column: int = mini(floori(float(frame) * 0.5), 3)
+	_draw_sprite_frame(sheet, destination, column, row, fall_row + 1, tint)
+	if frame % 2 == 1:
+		var next_column: int = 0 if loop_frames and column == 3 else mini(column + 1, 3)
+		if next_column != column:
+			var blend_tint := tint
+			blend_tint.a *= 0.5
+			_draw_sprite_frame(sheet, destination, next_column, row, fall_row + 1, blend_tint)
 	if not unit.is_hero and unit.conscious():
 		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
 		draw_rect(Rect2(center + Vector2(-45, -93), Vector2(90, 7)), Color(0.12, 0.04, 0.04, 0.8), true)
 		draw_rect(Rect2(center + Vector2(-44, -92), Vector2(88.0 * ratio, 5)), Color("d84b39"), true)
+
+
+func _draw_sprite_frame(sheet: Texture2D, destination: Rect2, column: int, row: int, rows: int, tint: Color) -> void:
+	# Integer bounds and a small gutter keep filtered pixels from neighboring atlas cells out.
+	var left: int = roundi(float(column * sheet.get_width()) / 4.0) + 2
+	var right: int = roundi(float((column + 1) * sheet.get_width()) / 4.0) - 2
+	var top: int = roundi(float(row * sheet.get_height()) / float(rows)) + 2
+	var bottom: int = roundi(float((row + 1) * sheet.get_height()) / float(rows)) - 2
+	draw_texture_rect_region(sheet, destination, Rect2(left, top, right - left, bottom - top), tint)
 
 
 func _draw_hero_sprite(hero, center: Vector2, tint: Color) -> void:
