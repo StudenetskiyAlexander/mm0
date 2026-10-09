@@ -7,14 +7,23 @@ const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-8f.png")
+const WARRIOR_TARGET_MASK: Texture2D = preload("res://assets/warrior-target-mask-8f.png")
 const MAGE_ANIMATION: Texture2D = preload("res://assets/mage-animation-8f.png")
+const MAGE_TARGET_MASK: Texture2D = preload("res://assets/mage-target-mask-8f.png")
 const MAGE_IDLE: Texture2D = preload("res://assets/mage-idle.png")
+const MAGE_IDLE_MASK: Texture2D = preload("res://assets/mage-idle-mask.png")
 const CLERIC_ANIMATION: Texture2D = preload("res://assets/cleric-animation-8f.png")
+const CLERIC_TARGET_MASK: Texture2D = preload("res://assets/cleric-target-mask-8f.png")
 const ARCHER_ANIMATION: Texture2D = preload("res://assets/archer-animation-8f.png")
+const ARCHER_TARGET_MASK: Texture2D = preload("res://assets/archer-target-mask-8f.png")
 const ARCHER_IDLE: Texture2D = preload("res://assets/archer-idle.png")
+const ARCHER_IDLE_MASK: Texture2D = preload("res://assets/archer-idle-mask.png")
 const SMALL_GOBLIN_ANIMATION: Texture2D = preload("res://assets/small-goblin-animation-8f.png")
+const SMALL_GOBLIN_TARGET_MASK: Texture2D = preload("res://assets/small-goblin-target-mask-8f.png")
 const ARMORED_GOBLIN_ANIMATION: Texture2D = preload("res://assets/armored-goblin-animation-8f.png")
+const ARMORED_GOBLIN_TARGET_MASK: Texture2D = preload("res://assets/armored-goblin-target-mask-8f.png")
 const WOLF_ANIMATION: Texture2D = preload("res://assets/wolf-animation-8f.png")
+const WOLF_TARGET_MASK: Texture2D = preload("res://assets/wolf-target-mask-8f.png")
 const WARRIOR_PORTRAITS: Texture2D = preload("res://assets/warrior-portrait-sheet.png")
 const MAGE_PORTRAITS: Texture2D = preload("res://assets/mage-portrait-sheet.png")
 const CLERIC_PORTRAITS: Texture2D = preload("res://assets/cleric-portrait-sheet.png")
@@ -270,9 +279,8 @@ func _draw_targeting_markers() -> void:
 		var hovered: bool = _target_hitbox(target).has_point(mouse_point)
 		if targeting_action == "quick_heal":
 			hovered = hovered or _hero_portrait_rect(battle.heroes.find(target)).has_point(mouse_point)
-		var color := Color("ffe396") if hovered else Color("8ee6b0")
-		draw_arc(center, 84.0, 0.0, TAU, 48, color, 3.0 if hovered else 2.0, true)
-		draw_circle(center + Vector2(0, 68), 4.0, color)
+		if hovered:
+			_draw_target_sign(center + Vector2(48 if target.is_hero else -48, -88), targeting_action == "quick_heal")
 	var key := "E"
 	if targeting_action == "melee_attack":
 		key = "Q"
@@ -280,9 +288,22 @@ func _draw_targeting_markers() -> void:
 		key = "W"
 	var banner := Rect2(650, 101, 620, 49)
 	draw_rect(banner, Color(0.05, 0.09, 0.08, 0.91), true)
-	draw_rect(banner, Color("8ee6b0"), false, 2.0)
+	draw_rect(banner, Color("8ee6b0") if targeting_action == "quick_heal" else Color("e6b974"), false, 2.0)
 	var prompt := "ВЫБЕРИТЕ ГЕРОЯ  ·  ESC — ОТМЕНА  ·  E — САМЫЙ РАНЕНЫЙ" if targeting_action == "quick_heal" else "ВЫБЕРИТЕ ВРАГА  ·  ESC — ОТМЕНА  ·  %s — СЛУЧАЙНАЯ ЦЕЛЬ" % key
 	_text(prompt, Vector2(664, 131), 16, Color("e3f4df"), 590.0)
+
+
+func _draw_target_sign(center: Vector2, healing: bool) -> void:
+	var edge: Color = Color("a9f0c3") if healing else Color("ffda8b")
+	draw_colored_polygon(PackedVector2Array([center + Vector2(0, -14), center + Vector2(14, 0), center + Vector2(0, 14), center + Vector2(-14, 0)]), Color(0.05, 0.10, 0.10, 0.9))
+	draw_polyline(PackedVector2Array([center + Vector2(0, -14), center + Vector2(14, 0), center + Vector2(0, 14), center + Vector2(-14, 0), center + Vector2(0, -14)]), edge, 2.0, true)
+	if healing:
+		draw_line(center + Vector2(-7, 0), center + Vector2(7, 0), edge, 3.0, true)
+		draw_line(center + Vector2(0, -7), center + Vector2(0, 7), edge, 3.0, true)
+	else:
+		draw_line(center + Vector2(-5, 6), center + Vector2(6, -7), edge, 2.5, true)
+		draw_line(center + Vector2(-6, 2), center + Vector2(-1, 7), edge, 2.0, true)
+		draw_line(center + Vector2(-7, 9), center + Vector2(-4, 6), edge, 2.0, true)
 
 
 func _target_hitbox(unit) -> Rect2:
@@ -331,6 +352,59 @@ func _animation_sheet(unit) -> Texture2D:
 			"forest_wolf":
 				return WOLF_ANIMATION
 	return null
+
+
+func _target_mask_sheet(unit) -> Texture2D:
+	if unit.is_hero:
+		match unit.class_id():
+			"warrior":
+				return WARRIOR_TARGET_MASK
+			"mage":
+				return MAGE_TARGET_MASK
+			"cleric":
+				return CLERIC_TARGET_MASK
+			"archer":
+				return ARCHER_TARGET_MASK
+	else:
+		match unit.id():
+			"small_goblin":
+				return SMALL_GOBLIN_TARGET_MASK
+			"armored_goblin":
+				return ARMORED_GOBLIN_TARGET_MASK
+			"forest_wolf":
+				return WOLF_TARGET_MASK
+	return null
+
+
+func _target_outline_state(unit) -> int:
+	if targeting_action == "" or not battle.can_hero_act(targeting_hero_index):
+		return 0
+	var targets: Array = battle.available_heal_targets(targeting_hero_index) if targeting_action == "quick_heal" else battle.available_enemy_targets(targeting_hero_index, targeting_action)
+	if not targets.has(unit):
+		return 0
+	var mouse_point: Vector2 = get_local_mouse_position()
+	var hovered: bool = _target_hitbox(unit).has_point(mouse_point)
+	if targeting_action == "quick_heal":
+		hovered = hovered or _hero_portrait_rect(battle.heroes.find(unit)).has_point(mouse_point)
+	return 2 if hovered else 1
+
+
+func _draw_target_outline(mask: Texture2D, destination: Rect2, column: int, row: int, rows: int, idle: bool, strength: int) -> void:
+	if mask == null or strength == 0:
+		return
+	var glow: Color = Color("a0f1c0") if targeting_action == "quick_heal" else Color("ffd18a")
+	var pulse: float = 0.5 + 0.5 * sin(animation_time * 4.0)
+	if strength == 1:
+		glow.a = 0.14 + 0.04 * pulse
+	else:
+		glow.a = 0.29 + 0.09 * pulse
+	var radius: float = 2.0 if strength == 1 else 4.0
+	for offset in [Vector2(-radius, 0), Vector2(radius, 0), Vector2(0, -radius), Vector2(0, radius), Vector2(-radius, -radius), Vector2(radius, -radius), Vector2(-radius, radius), Vector2(radius, radius)]:
+		var shifted := Rect2(destination.position + offset, destination.size)
+		if idle:
+			draw_texture_rect(mask, shifted, false, glow)
+		else:
+			_draw_sprite_frame(mask, shifted, column, row, rows, glow)
 
 
 func _draw_frame_unit(unit, sheet: Texture2D) -> void:
@@ -418,6 +492,17 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 			size *= float(CLERIC_HEAL_FRAME_SCALES[frame])
 	var destination := Rect2(Vector2(center.x - size.x * 0.5, bottom_y - size.y), size)
 	var use_standing_sprite: bool = unit.is_hero and unit.conscious() and not movement_animations.has(unit_id) and not action_animations.has(unit_id) and not impact_animations.has(unit_id) and not fall_animations.has(unit_id) and not death_animations.has(unit_id)
+	var outline_strength: int = _target_outline_state(unit)
+	if outline_strength > 0:
+		var mask: Texture2D = _target_mask_sheet(unit)
+		var idle_mask: bool = false
+		if use_standing_sprite and unit.class_id() == "mage":
+			mask = MAGE_IDLE_MASK
+			idle_mask = true
+		elif use_standing_sprite and unit.class_id() == "archer":
+			mask = ARCHER_IDLE_MASK
+			idle_mask = true
+		_draw_target_outline(mask, destination, frame, row, fall_row + 1, idle_mask, outline_strength)
 	if use_standing_sprite and unit.class_id() == "mage":
 		draw_texture_rect(MAGE_IDLE, destination, false, tint)
 	elif use_standing_sprite and unit.class_id() == "archer":
@@ -616,7 +701,7 @@ func _draw_hero_panel() -> void:
 		_draw_portrait(hero, portrait, index)
 		if targeting_action == "quick_heal" and hero.alive():
 			var hovered: bool = portrait.has_point(get_local_mouse_position())
-			draw_rect(portrait, Color("ffe396") if hovered else Color("8ee6b0"), false, 4.0)
+			draw_rect(portrait, Color("b9ffd1") if hovered else Color("8ee6b0"), false, 4.0)
 		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(21, top + 141), 14, Color.WHITE)
 		_draw_resource_bar(Rect2(14, top + 155, 192, 17), hero.health, hero.max_health(), Color("d83834"))
 		_draw_resource_bar(Rect2(14, top + 178, 192, 17), hero.mana, hero.max_mana(), Color("3187dc"))

@@ -29,6 +29,9 @@ func _init() -> void:
 			push_error("Cannot write sprite sheet: %s (%d)" % [destination, error])
 			quit(1)
 			return
+		if not _save_silhouette_mask(packed, ProjectSettings.globalize_path("res://assets/%s-target-mask-8f.png" % unit_id)):
+			quit(1)
+			return
 		print("Created %s" % destination)
 	for unit_id in IDLE_UNITS:
 		if not _create_idle_frame(unit_id):
@@ -76,7 +79,23 @@ func _create_idle_frame(unit_id: String) -> bool:
 	if error != OK:
 		push_error("Cannot write idle sprite: %s (%d)" % [destination, error])
 		return false
+	if not _save_silhouette_mask(result, ProjectSettings.globalize_path("res://assets/%s-idle-mask.png" % unit_id)):
+		return false
 	print("Created %s" % destination)
+	return true
+
+
+func _save_silhouette_mask(source: Image, destination: String) -> bool:
+	var pixels: PackedByteArray = source.get_data()
+	for index in range(0, pixels.size(), 4):
+		pixels[index] = 255
+		pixels[index + 1] = 255
+		pixels[index + 2] = 255
+	var mask: Image = Image.create_from_data(source.get_width(), source.get_height(), false, Image.FORMAT_RGBA8, pixels)
+	var error: Error = mask.save_png(destination)
+	if error != OK:
+		push_error("Cannot write target silhouette: %s (%d)" % [destination, error])
+		return false
 	return true
 
 
