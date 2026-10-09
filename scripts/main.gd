@@ -55,6 +55,8 @@ var setup_notice: Label
 var hero_checks := {}
 var hero_levels := {}
 var enemy_counts := {}
+var music_select: OptionButton
+var music_preview_button: Button
 var log_panel: PanelContainer
 var log_content: RichTextLabel
 var animation_time := 0.0
@@ -75,6 +77,7 @@ func _ready() -> void:
 	font = get_theme_default_font()
 	battle_audio = BATTLE_AUDIO.new()
 	add_child(battle_audio)
+	battle_audio.music_preview_finished.connect(_on_music_preview_finished)
 	catalog.load_all()
 	battle.event_logged.connect(_on_battle_event)
 	battle.battle_ended.connect(_on_battle_end)
@@ -982,6 +985,23 @@ func _build_setup_overlay() -> void:
 		count.custom_minimum_size = Vector2(145, 44)
 		row.add_child(count)
 		enemy_counts[str(profile.get("id", ""))] = count
+	body.add_child(_label("МУЗЫКА БОЯ", 23, Color("e9c675")))
+	var music_row := HBoxContainer.new()
+	music_row.add_theme_constant_override("separation", 14)
+	body.add_child(music_row)
+	music_select = OptionButton.new()
+	music_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	music_select.custom_minimum_size = Vector2(0, 44)
+	for index in range(BATTLE_AUDIO.MUSIC_TITLES.size()):
+		music_select.add_item(str(BATTLE_AUDIO.MUSIC_TITLES[index]), index)
+	music_select.select(0)
+	music_select.item_selected.connect(_on_music_selected)
+	music_row.add_child(music_select)
+	music_preview_button = Button.new()
+	music_preview_button.text = "ПРОСЛУШАТЬ"
+	music_preview_button.custom_minimum_size = Vector2(190, 44)
+	music_preview_button.pressed.connect(_toggle_music_preview)
+	music_row.add_child(music_preview_button)
 	setup_notice = _label("", 17, Color("f1a09a"))
 	body.add_child(setup_notice)
 	var start_button := Button.new()
@@ -1063,7 +1083,7 @@ func _begin_battle() -> void:
 	_clear_animations()
 	setup_notice.text = ""
 	setup_overlay.hide()
-	battle_audio.start_battle()
+	battle_audio.start_battle(music_select.get_selected_id())
 	battle.start(chosen_heroes, chosen_enemies)
 	queue_redraw()
 
@@ -1071,9 +1091,28 @@ func _begin_battle() -> void:
 func _show_setup() -> void:
 	_cancel_targeting()
 	battle_audio.stop_battle()
+	music_preview_button.text = "ПРОСЛУШАТЬ"
 	log_panel.hide()
 	setup_overlay.show()
 	queue_redraw()
+
+
+func _toggle_music_preview() -> void:
+	if battle_audio.previewing:
+		battle_audio.stop_preview()
+		music_preview_button.text = "ПРОСЛУШАТЬ"
+	else:
+		battle_audio.preview_theme(music_select.get_selected_id())
+		music_preview_button.text = "ОСТАНОВИТЬ"
+
+
+func _on_music_selected(_index: int) -> void:
+	if battle_audio.previewing:
+		battle_audio.preview_theme(music_select.get_selected_id())
+
+
+func _on_music_preview_finished() -> void:
+	music_preview_button.text = "ПРОСЛУШАТЬ"
 
 
 func _sync_audio_pause() -> void:

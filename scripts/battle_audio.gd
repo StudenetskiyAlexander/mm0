@@ -1,7 +1,12 @@
 extends Node
 
 const BOARD = preload("res://scripts/battle_board.gd")
-const BATTLE_THEME: AudioStreamWAV = preload("res://assets/audio/battle-theme.wav")
+const MUSIC_TITLES := ["Героический поход", "Туманные перевалы", "Железный рубеж"]
+const BATTLE_THEMES := [
+	preload("res://assets/audio/battle-theme.wav"),
+	preload("res://assets/audio/battle-misty-pass.wav"),
+	preload("res://assets/audio/battle-iron-march.wav"),
+]
 const SOUNDS := {
 	"sword_swing": preload("res://assets/audio/sword_swing.wav"),
 	"hit": preload("res://assets/audio/hit.wav"),
@@ -23,14 +28,18 @@ var active_players: Array[AudioStreamPlayer] = []
 var queued_sounds: Array[Dictionary] = []
 var paused := false
 var music_enabled := false
+var previewing := false
 var step_cooldown := 0.0
+
+signal music_preview_finished
 
 
 func _ready() -> void:
 	music_player = AudioStreamPlayer.new()
-	music_player.stream = BATTLE_THEME
+	music_player.stream = BATTLE_THEMES[0]
 	music_player.volume_db = -4.0
 	add_child(music_player)
+	music_player.finished.connect(_on_music_finished)
 
 
 func _process(delta: float) -> void:
@@ -49,8 +58,9 @@ func _process(delta: float) -> void:
 			queued_sounds[index] = sound
 
 
-func start_battle() -> void:
+func start_battle(theme_index: int = 0) -> void:
 	stop_battle()
+	music_player.stream = BATTLE_THEMES[clampi(theme_index, 0, BATTLE_THEMES.size() - 1)]
 	music_enabled = true
 	paused = false
 	music_player.stream_paused = false
@@ -65,6 +75,7 @@ func finish_battle() -> void:
 
 func stop_battle() -> void:
 	music_enabled = false
+	previewing = false
 	music_player.stop()
 	queued_sounds.clear()
 	step_cooldown = 0.0
@@ -72,6 +83,26 @@ func stop_battle() -> void:
 		player.stop()
 		player.queue_free()
 	active_players.clear()
+
+
+func preview_theme(theme_index: int) -> void:
+	stop_battle()
+	music_player.stream = BATTLE_THEMES[clampi(theme_index, 0, BATTLE_THEMES.size() - 1)]
+	music_player.stream_paused = false
+	previewing = true
+	music_player.play()
+
+
+func stop_preview() -> void:
+	if previewing:
+		previewing = false
+		music_player.stop()
+
+
+func _on_music_finished() -> void:
+	if previewing:
+		previewing = false
+		music_preview_finished.emit()
 
 
 func set_audio_paused(value: bool) -> void:
