@@ -27,6 +27,8 @@ const CLASS_NAMES := {"warrior": "Воин", "mage": "Маг", "cleric": "Кли
 const SLOT_ACTIONS := ["melee_attack", "shoot", "spell", "unused", "health_potion", "mana_potion"]
 const SLOT_KEYS := ["Q", "W", "E", "R", "A", "S"]
 const ANIMATION_ATLAS_WIDTH_SCALE := 1.25
+const HERO_BATTLE_SPRITE_SCALE := 1.10
+const GOBLIN_BATTLE_SPRITE_SCALE := 0.85
 
 var catalog = CATALOG.new()
 var battle = BATTLE.new()
@@ -394,16 +396,23 @@ func _draw_frame_unit(unit, sheet: Texture2D) -> void:
 		var spawn: Dictionary = spawn_animations[unit_id]
 		tint.a *= clampf(float(spawn["elapsed"]) / float(spawn["duration"]), 0.0, 1.0)
 	var size := Vector2(170, 170) if unit.is_hero else Vector2(168, 168)
-	if not unit.is_hero and unit.id() == "forest_wolf":
+	if unit.is_hero:
+		size *= HERO_BATTLE_SPRITE_SCALE
+	elif unit.id() == "forest_wolf":
 		size = Vector2(194, 160)
+	elif unit.id() == "small_goblin" or unit.id() == "armored_goblin":
+		size *= GOBLIN_BATTLE_SPRITE_SCALE
 	size.x *= ANIMATION_ATLAS_WIDTH_SCALE
 	var center: Vector2 = _unit_position(unit)
 	var destination := Rect2(center - Vector2(size.x * 0.5, size.y * 0.56), size)
 	_draw_sprite_frame(sheet, destination, frame, row, fall_row + 1, tint)
 	if not unit.is_hero and unit.conscious():
 		var ratio: float = clampf(float(unit.health) / float(maxi(1, unit.max_health())), 0.0, 1.0)
-		draw_rect(Rect2(center + Vector2(-45, -93), Vector2(90, 7)), Color(0.12, 0.04, 0.04, 0.8), true)
-		draw_rect(Rect2(center + Vector2(-44, -92), Vector2(88.0 * ratio, 5)), Color("d84b39"), true)
+		var is_goblin: bool = unit.id() == "small_goblin" or unit.id() == "armored_goblin"
+		var bar_width: float = 76.0 if is_goblin else 90.0
+		var bar_y: float = -82.0 if is_goblin else -93.0
+		draw_rect(Rect2(center + Vector2(-bar_width * 0.5, bar_y), Vector2(bar_width, 7)), Color(0.12, 0.04, 0.04, 0.8), true)
+		draw_rect(Rect2(center + Vector2(1.0 - bar_width * 0.5, bar_y + 1.0), Vector2((bar_width - 2.0) * ratio, 5)), Color("d84b39"), true)
 
 
 func _draw_sprite_frame(sheet: Texture2D, destination: Rect2, column: int, row: int, rows: int, tint: Color) -> void:
