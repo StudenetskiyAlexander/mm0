@@ -1,5 +1,7 @@
 work/
 .godot/
+*.import
+*.gd.uid
 .DS_Store
 outputs/*.png
 outputs/*.svg
