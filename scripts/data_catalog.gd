@@ -2,14 +2,21 @@ extends RefCounted
 
 const HERO_DIRECTORY := "res://outputs/game-data/heroes"
 const ENEMY_DIRECTORY := "res://outputs/game-data/enemies"
+const EQUIPMENT_DIRECTORY := "res://outputs/game-data/equipment"
 
 var heroes: Array[Dictionary] = []
 var enemies: Array[Dictionary] = []
+var equipment: Dictionary = {}
 
 
 func load_all() -> void:
 	heroes = _load_folder(HERO_DIRECTORY)
 	enemies = _load_folder(ENEMY_DIRECTORY)
+	equipment.clear()
+	for item in _load_folder(EQUIPMENT_DIRECTORY):
+		var item_id := str(item.get("id", ""))
+		if item_id != "":
+			equipment[item_id] = item
 
 
 func _load_folder(folder: String) -> Array[Dictionary]:
@@ -41,3 +48,7 @@ func enemy_profile(enemy_id: String) -> Dictionary:
 		if str(profile.get("id", "")) == enemy_id:
 			return profile
 	return {}
+
+
+func equipment_profile(item_id: String) -> Dictionary:
+	return equipment.get(item_id, {})

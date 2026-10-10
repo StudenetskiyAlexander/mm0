@@ -22,6 +22,15 @@
   },
   "unspent_attribute_points": 0,
   "unspent_skill_points": 2,
+  "inventory": [
+    {
+      "item_id": "simple_sword",
+      "position_cells": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
   "armor": {
     "name": "Кольчуга",
     "skill_id": "chain_armor"

@@ -75,6 +75,7 @@ const CLERIC_MELEE_FRAME_SCALES := [1.0, 1.05, 1.13, 1.22, 1.20, 1.22, 1.08, 1.0
 const CLERIC_HEAL_FRAME_SCALES := [1.0, 1.12, 1.19, 1.22, 1.20, 1.20, 1.10, 1.0]
 
 var catalog = CATALOG.new()
+var equipment_textures: Dictionary = {}
 var battle = BATTLE.new()
 var font: Font
 var combat_log: Array[String] = []
@@ -115,6 +116,13 @@ func _ready() -> void:
 	add_child(battle_audio)
 	battle_audio.music_preview_finished.connect(_on_music_preview_finished)
 	catalog.load_all()
+	for item_id in catalog.equipment:
+		var item: Dictionary = catalog.equipment[item_id]
+		var image_path: String = str(item.get("image", ""))
+		if image_path != "":
+			var texture: Texture2D = load(image_path) as Texture2D
+			if texture != null:
+				equipment_textures[item_id] = texture
 	battle.event_logged.connect(_on_battle_event)
 	battle.battle_ended.connect(_on_battle_end)
 	battle.visual_event.connect(_on_visual_event)
@@ -450,8 +458,15 @@ func _draw_inventory_tab(hero) -> void:
 	draw_line(Vector2(435, 194), Vector2(935, 194), Color("67583d"), 2.0, true)
 	draw_line(Vector2(1000, 194), Vector2(1465, 194), Color("67583d"), 2.0, true)
 	_draw_inventory_grid()
+	var inventory: Array = hero.profile.get("inventory", [])
+	_draw_inventory_items(inventory)
 	_draw_equipment_area()
-	_text("РЮКЗАК ПУСТ", Vector2(435, 755), 17, Color("8f9b91"))
+	if inventory.is_empty():
+		_text("РЮКЗАК ПУСТ", Vector2(435, 755), 17, Color("8f9b91"))
+	else:
+		var first_entry: Dictionary = inventory[0]
+		var first_item: Dictionary = catalog.equipment_profile(str(first_entry.get("item_id", "")))
+		_text(str(first_item.get("name", "Предмет")), Vector2(435, 755), 17, Color("e6cb83"))
 
 
 func _draw_inventory_grid() -> void:
@@ -463,6 +478,30 @@ func _draw_inventory_grid() -> void:
 			draw_rect(cell, Color("222c2a") if (row + column) % 2 == 0 else Color("1d2726"), true)
 			draw_rect(cell, Color("50594d"), false, 1.0)
 	draw_rect(Rect2(grid_origin, Vector2(500, 500)), Color("ac9362"), false, 2.0)
+
+
+func _draw_inventory_items(inventory: Array) -> void:
+	for entry in inventory:
+		if not entry is Dictionary:
+			continue
+		var item_id: String = str(entry.get("item_id", ""))
+		var item: Dictionary = catalog.equipment_profile(item_id)
+		if item.is_empty():
+			continue
+		var position_cells: Dictionary = entry.get("position_cells", {})
+		var size_cells: Dictionary = item.get("size_cells", {})
+		var column: int = int(position_cells.get("x", -1))
+		var row: int = int(position_cells.get("y", -1))
+		var width_cells: int = int(size_cells.get("width", 0))
+		var height_cells: int = int(size_cells.get("height", 0))
+		if column < 0 or row < 0 or width_cells < 1 or height_cells < 1 or column + width_cells > 10 or row + height_cells > 10:
+			continue
+		var item_rect := Rect2(Vector2(435 + column * 50, 210 + row * 50), Vector2(width_cells * 50, height_cells * 50))
+		draw_rect(item_rect.grow(-2), Color("34332b"), true)
+		draw_rect(item_rect.grow(-2), Color("d3ad68"), false, 2.0)
+		var item_texture: Texture2D = equipment_textures.get(item_id, null)
+		if item_texture != null:
+			draw_texture_rect(item_texture, item_rect.grow(-5), false)
 
 
 func _draw_equipment_area() -> void:
