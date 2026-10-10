@@ -7,7 +7,6 @@ const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
 const SKILLS = preload("res://scripts/skill_catalog.gd")
 const INVENTORY_STATE = preload("res://scripts/inventory_state.gd")
-const EQUIPMENT_ICON_BACKGROUND: Texture2D = preload("res://assets/equipment/inventory-backdrop.png")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const WORLD_MAP: Texture2D = preload("res://assets/world-map-preview.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
@@ -504,7 +503,7 @@ func _draw_inventory_items(inventory: Array) -> void:
 		if item_rect.size == Vector2.ZERO:
 			continue
 		var hovered: bool = item_rect.has_point(get_local_mouse_position())
-		draw_rect(item_rect.grow(-2), Color("34332b"), true)
+		draw_rect(item_rect.grow(-2), Color.BLACK, true)
 		draw_rect(item_rect.grow(-2), Color("f5d58e") if hovered else Color("d3ad68"), false, 3.0 if hovered else 2.0)
 		_draw_equipment_icon(item_id, item_rect)
 
@@ -515,7 +514,6 @@ func _draw_equipment_icon(item_id: String, rect: Rect2, opacity: float = 1.0) ->
 		return
 	var inner_rect: Rect2 = rect.grow(-5)
 	var tint := Color(1.0, 1.0, 1.0, opacity)
-	draw_texture_rect(EQUIPMENT_ICON_BACKGROUND, inner_rect, false, tint)
 	var source_size: Vector2 = texture.get_size()
 	if source_size.x <= 0.0 or source_size.y <= 0.0:
 		return
@@ -632,7 +630,7 @@ func _draw_equipment_slot(rect: Rect2, label: String, item: Dictionary) -> void:
 		var item_rect := rect
 		if item_size.x > 0.0 and item_size.y > 0.0:
 			item_rect = Rect2(rect.position + (rect.size - item_size) * 0.5, item_size)
-		draw_rect(item_rect.grow(-2), Color("34332b"), true)
+		draw_rect(item_rect.grow(-2), Color.BLACK, true)
 		_draw_equipment_icon(str(item.get("id", "")), item_rect)
 	else:
 		draw_rect(rect.grow(-6), Color("48544a"), false, 1.0)
