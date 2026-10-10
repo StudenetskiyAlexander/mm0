@@ -47,14 +47,16 @@ const HERO_SHEET_RECT := Rect2(375, 55, 1150, 890)
 const HERO_SHEET_TAB_NAMES := ["ХАРАКТЕРИСТИКИ", "НАВЫКИ", "ИНВЕНТАРЬ", "СПОСОБНОСТИ"]
 const HERO_ATTRIBUTE_KEYS := ["strength", "dexterity", "endurance", "intelligence"]
 const HERO_ATTRIBUTE_NAMES := ["Сила", "Ловкость", "Выносливость", "Интеллект"]
-const HERO_DERIVED_STAT_NAMES := ["Точность удара", "Точность выстрела", "Защита", "Текущее здоровье", "Максимум здоровья", "Текущая мана", "Максимум маны"]
+const HERO_DERIVED_STAT_NAMES := ["Точность удара", "Урон в ближнем бою", "Точность выстрела", "Выстрел", "Защита", "Текущее здоровье", "Максимум здоровья", "Текущая мана", "Максимум маны"]
 const HERO_STAT_DESCRIPTIONS := {
 	"Сила": "Повышает точность и урон атак оружием ближнего боя.",
 	"Ловкость": "Повышает точность выстрелов и защиту.",
 	"Выносливость": "Определяет максимум здоровья: 5 очков за каждую единицу.",
 	"Интеллект": "Определяет максимум маны: 5 очков за каждую единицу.",
 	"Точность удара": "Сила + бонусы надетого оружия и соответствующего навыка. При атаке добавляется 1д20.",
+	"Урон в ближнем бою": "Бросок урона оружия + Сила. Урон наносится при попадании.",
 	"Точность выстрела": "Ловкость + бонусы надетого оружия и соответствующего навыка. После 5-й клетки штраф 3 за клетку.",
+	"Выстрел": "Бросок урона дальнобойного оружия без добавления Силы. Урон наносится при попадании.",
 	"Защита": "10 + ловкость + бонусы надетой брони и соответствующего навыка.",
 	"Текущее здоровье": "Оставшееся здоровье. При 0 герой теряет сознание, при значении ниже −10 погибает.",
 	"Максимум здоровья": "Верхний предел здоровья, равный 5 × Выносливость.",
@@ -421,16 +423,22 @@ func _draw_characteristics_tab(hero) -> void:
 	_text("БОЕВЫЕ ПОКАЗАТЕЛИ", Vector2(982, 182), 22, Color("e6cb83"))
 	draw_line(Vector2(980, 190), Vector2(1465, 190), Color("67583d"), 2.0, true)
 	_sheet_value_row("Точность удара", str(hero.accuracy()), _hero_derived_stat_row_rect(0), false, hovered_stat == "Точность удара")
+	var melee_dice: String = str(hero.weapon().get("damage_dice", "1d4")).replace("d", "д")
+	var melee_damage: String = melee_dice
+	if hero.attribute("strength") != 0:
+		melee_damage += " + %d" % hero.attribute("strength")
+	_sheet_value_row("Урон в ближнем бою", melee_damage, _hero_derived_stat_row_rect(1), false, hovered_stat == "Урон в ближнем бою")
 	var ranged_accuracy := str(hero.accuracy(true)) if hero.has_action("shoot") else "—"
-	_sheet_value_row("Точность выстрела", ranged_accuracy, _hero_derived_stat_row_rect(1), false, hovered_stat == "Точность выстрела")
-	_sheet_value_row("Защита", str(hero.defense()), _hero_derived_stat_row_rect(2), false, hovered_stat == "Защита")
-	_text("Точность указана без броска 1д20", Vector2(996, 405), 15, Color("a9ab9e"))
-	_text("ЗДОРОВЬЕ И МАНА", Vector2(982, 462), 22, Color("e6cb83"))
-	draw_line(Vector2(980, 470), Vector2(1465, 470), Color("67583d"), 2.0, true)
-	_sheet_value_row("Текущее здоровье", str(hero.health), _hero_derived_stat_row_rect(3), false, hovered_stat == "Текущее здоровье")
-	_sheet_value_row("Максимум здоровья", str(hero.max_health()), _hero_derived_stat_row_rect(4), false, hovered_stat == "Максимум здоровья")
-	_sheet_value_row("Текущая мана", str(hero.mana), _hero_derived_stat_row_rect(5), false, hovered_stat == "Текущая мана")
-	_sheet_value_row("Максимум маны", str(hero.max_mana()), _hero_derived_stat_row_rect(6), false, hovered_stat == "Максимум маны")
+	_sheet_value_row("Точность выстрела", ranged_accuracy, _hero_derived_stat_row_rect(2), false, hovered_stat == "Точность выстрела")
+	var ranged_damage: String = str(hero.weapon(true).get("damage_dice", "1d4")).replace("d", "д") if hero.has_action("shoot") else "—"
+	_sheet_value_row("Выстрел", ranged_damage, _hero_derived_stat_row_rect(3), false, hovered_stat == "Выстрел")
+	_sheet_value_row("Защита", str(hero.defense()), _hero_derived_stat_row_rect(4), false, hovered_stat == "Защита")
+	_text("ЗДОРОВЬЕ И МАНА", Vector2(982, 455), 22, Color("e6cb83"))
+	draw_line(Vector2(980, 463), Vector2(1465, 463), Color("67583d"), 2.0, true)
+	_sheet_value_row("Текущее здоровье", str(hero.health), _hero_derived_stat_row_rect(5), false, hovered_stat == "Текущее здоровье")
+	_sheet_value_row("Максимум здоровья", str(hero.max_health()), _hero_derived_stat_row_rect(6), false, hovered_stat == "Максимум здоровья")
+	_sheet_value_row("Текущая мана", str(hero.mana), _hero_derived_stat_row_rect(7), false, hovered_stat == "Текущая мана")
+	_sheet_value_row("Максимум маны", str(hero.max_mana()), _hero_derived_stat_row_rect(8), false, hovered_stat == "Максимум маны")
 	_draw_hero_stat_description(hero, hovered_stat)
 
 
@@ -648,9 +656,9 @@ func _hero_attribute_row_rect(index: int) -> Rect2:
 
 
 func _hero_derived_stat_row_rect(index: int) -> Rect2:
-	if index < 3:
-		return Rect2(980, 195 + float(index) * 62.0, 485, 53)
-	return Rect2(980, 475 + float(index - 3) * 62.0, 485, 53)
+	if index < 5:
+		return Rect2(980, 195 + float(index) * 46.0, 485, 42)
+	return Rect2(980, 475 + float(index - 5) * 62.0, 485, 53)
 
 
 func _hovered_hero_stat(point: Vector2) -> String:
