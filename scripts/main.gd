@@ -4,7 +4,9 @@ const BOARD = preload("res://scripts/battle_board.gd")
 const CATALOG = preload("res://scripts/data_catalog.gd")
 const BATTLE = preload("res://scripts/battle_state.gd")
 const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
+const COMBATANT = preload("res://scripts/combatant.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
+const WORLD_MAP: Texture2D = preload("res://assets/world-map-preview.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
 const WARRIOR_ANIMATION: Texture2D = preload("res://assets/warrior-animation-8f.png")
 const WARRIOR_ABILITIES: Texture2D = preload("res://assets/ability_animation/warrior-abilities-packed.png")
@@ -37,6 +39,9 @@ const ARCHER: Texture2D = preload("res://assets/human-archer.png")
 const ARCHER_SPRITE: Texture2D = preload("res://assets/human-archer-sprite.png")
 
 const SCREEN_SIZE := Vector2(1600, 1000)
+const MAP_RETURN_RECT := Rect2(1320, 20, 250, 54)
+const BATTLE_MAP_RECT := Rect2(1112, 12, 151, 69)
+const PREVIEW_GOLD_TEXT := "12 450"
 const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
 const CLASS_NAMES := {"warrior": "Воин", "mage": "Маг", "cleric": "Клирик", "archer": "Лучник"}
 const SLOT_ACTIONS := ["melee_attack", "shoot", "spell", "unused", "health_potion", "mana_potion"]
@@ -75,6 +80,9 @@ var visual_effects: Array[Dictionary] = []
 var targeting_action := ""
 var targeting_hero_index := -1
 var battle_audio
+var map_mode := false
+var map_return_to_setup := true
+var map_heroes: Array = []
 
 
 func _ready() -> void:
@@ -94,7 +102,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if setup_overlay.visible or log_panel.visible:
+	if map_mode or setup_overlay.visible or log_panel.visible:
 		return
 	battle.tick(delta)
 	if targeting_action != "" and not battle.can_hero_act(targeting_hero_index):
@@ -104,6 +112,16 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if map_mode:
+		if event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_M:
+				_close_map()
+				get_viewport().set_input_as_handled()
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if MAP_RETURN_RECT.has_point(event.position):
+				_close_map()
+				get_viewport().set_input_as_handled()
+		return
 	if setup_overlay.visible:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -126,6 +144,9 @@ func _input(event: InputEvent) -> void:
 
 func _handle_key(event: InputEventKey) -> void:
 	var key := event.physical_keycode
+	if key == KEY_M:
+		_open_map_from_battle()
+		return
 	if key >= KEY_1 and key <= KEY_4:
 		battle.select_hero(key - KEY_1)
 	elif key == KEY_SPACE:
@@ -200,6 +221,9 @@ func _cancel_targeting() -> void:
 
 
 func _handle_click(point: Vector2) -> void:
+	if BATTLE_MAP_RECT.has_point(point):
+		_open_map_from_battle()
+		return
 	if battle.ended and Rect2(650, 540, 300, 68).has_point(point):
 		_show_setup()
 		return
@@ -243,23 +267,64 @@ func _handle_click(point: Vector2) -> void:
 
 
 func _draw() -> void:
+	if map_mode:
+		_draw_map_screen()
+		return
 	draw_texture_rect(BACKGROUND, Rect2(Vector2.ZERO, SCREEN_SIZE), false)
+	_draw_gold_counter()
 	_draw_top_status()
 	_draw_units()
 	_draw_targeting_banner()
 	_draw_visual_effects()
-	_draw_hero_panel()
+	_draw_hero_panel(battle.heroes, false)
 	_draw_journal_preview()
 	if battle.ended and not setup_overlay.visible:
 		_draw_end_banner()
 
 
 func _draw_top_status() -> void:
+	draw_rect(BATTLE_MAP_RECT, Color(0.04, 0.05, 0.06, 0.82), true)
+	draw_rect(BATTLE_MAP_RECT, Color("b89b63"), false, 2.0)
+	_text("КАРТА", Vector2(1139, 54), 21, Color("f2e1ae"))
 	draw_rect(Rect2(1280, 12, 296, 69), Color(0.04, 0.05, 0.06, 0.82), true)
 	draw_rect(Rect2(1280, 12, 296, 69), Color("b89b63"), false, 2.0)
 	_text("ВРАГИ: %d / %d" % [battle.defeated_enemies, battle.defeated_enemies + battle.enemies_remaining_to_spawn + _living_enemy_count()], Vector2(1295, 42), 20, Color("f2e1ae"))
 	var phase_label := "ГЕРОИ" if battle.phase == "heroes" else "ВРАГИ"
 	_text("РАУНД %d · %s" % [battle.round_number, phase_label], Vector2(1295, 67), 15, Color("d6d8d2"))
+
+
+func _draw_gold_counter() -> void:
+	var plate := Rect2(12, 12, 326, 70)
+	draw_rect(plate, Color(0.04, 0.05, 0.06, 0.9), true)
+	draw_rect(plate, Color("b89b63"), false, 3.0)
+	draw_circle(Vector2(48, 47), 19.0, Color("593c16"))
+	draw_circle(Vector2(48, 47), 16.0, Color("efbd4c"))
+	draw_arc(Vector2(48, 47), 12.0, 0.0, TAU, 32, Color("fff0a9"), 2.0, true)
+	draw_circle(Vector2(48, 47), 5.0, Color("cf842e"))
+	_text(PREVIEW_GOLD_TEXT, Vector2(80, 58), 29, Color("f8df9b"))
+
+
+func _draw_map_screen() -> void:
+	draw_rect(Rect2(Vector2.ZERO, SCREEN_SIZE), Color("19211f"), true)
+	draw_rect(Rect2(350, 98, 1240, 814), Color("1b1b19"), true)
+	draw_rect(Rect2(350, 98, 1240, 814), Color("b89b63"), false, 4.0)
+	var map_rect := Rect2(364, 112, 1212, 786)
+	var map_size: Vector2 = WORLD_MAP.get_size()
+	var visible_height: float = map_size.x * map_rect.size.y / map_rect.size.x
+	var source := Rect2(0, (map_size.y - visible_height) * 0.5, map_size.x, visible_height)
+	draw_texture_rect_region(WORLD_MAP, map_rect, source)
+	draw_rect(Rect2(363, 111, 1214, 788), Color("5d5036"), false, 2.0)
+	draw_rect(Rect2(350, 8, 1240, 82), Color("111718"), true)
+	draw_rect(Rect2(350, 8, 1240, 82), Color("b89b63"), false, 3.0)
+	_text("КАРТА МИРА", Vector2(375, 62), 33, Color("f2d58b"))
+	draw_rect(MAP_RETURN_RECT, Color("26352f"), true)
+	draw_rect(MAP_RETURN_RECT, Color("b89b63"), false, 2.0)
+	_text("НАЗАД · ESC", Vector2(1345, 56), 19, Color("f0e0bb"))
+	draw_rect(Rect2(350, 921, 1240, 67), Color("111718"), true)
+	draw_rect(Rect2(350, 921, 1240, 67), Color("b89b63"), false, 2.0)
+	_text("Карта мира", Vector2(377, 963), 20, Color("e8d7ad"))
+	_draw_gold_counter()
+	_draw_hero_panel(map_heroes, true)
 
 
 func _living_enemy_count() -> int:
@@ -711,7 +776,7 @@ func _draw_projectile(effect: Dictionary, progress: float) -> void:
 		draw_circle(position + direction * 3.0, 5.0, Color("ffefaa"))
 
 
-func _draw_hero_panel() -> void:
+func _draw_hero_panel(party: Array, map_view: bool) -> void:
 	draw_rect(Rect2(0, 100, 348, 900), Color(0.07, 0.06, 0.05, 0.94), true)
 	draw_rect(Rect2(346, 100, 4, 900), Color("ac8750"), true)
 	for index in range(4):
@@ -719,29 +784,44 @@ func _draw_hero_panel() -> void:
 		var panel := Rect2(8, top, 330, 202)
 		draw_rect(panel, Color(0.14, 0.13, 0.11, 0.96), true)
 		draw_rect(panel, Color("8d8064"), false, 3.0)
-		if index >= battle.heroes.size():
+		if index >= party.size():
 			_text("Пустая ячейка", Vector2(88, top + 108), 18, Color("8b8c86"))
 			continue
-		var hero = battle.heroes[index]
-		var selected: bool = battle.can_hero_act(index)
-		var edge := Color("f6cf62") if selected else Color("717b7d")
+		var hero = party[index]
+		var selected: bool = not map_view and battle.can_hero_act(index)
+		var edge := Color("c8ae76") if map_view else (Color("f6cf62") if selected else Color("717b7d"))
 		var portrait := _hero_portrait_rect(index)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
 		_draw_portrait(hero, portrait, index)
-		if targeting_action == "quick_heal" and hero.alive():
+		if not map_view and targeting_action == "quick_heal" and hero.alive():
 			var hovered: bool = portrait.has_point(get_local_mouse_position())
 			draw_rect(portrait, Color("b9ffd1") if hovered else Color("8ee6b0"), false, 4.0)
 		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(21, top + 141), 14, Color.WHITE)
 		_draw_resource_bar(Rect2(14, top + 155, 192, 17), hero.health, hero.max_health(), Color("d83834"))
 		_draw_resource_bar(Rect2(14, top + 178, 192, 17), hero.mana, hero.max_mana(), Color("3187dc"))
-		for slot in range(6):
-			_draw_action_slot(hero, top, slot)
+		if map_view:
+			_draw_map_class_badge(hero, top)
+		else:
+			for slot in range(6):
+				_draw_action_slot(hero, top, slot)
 		if not hero.conscious():
 			var status := "МЁРТВ" if not hero.alive() else "БЕЗ СОЗНАНИЯ"
 			_text(status, Vector2(27, top + 78), 16, Color("f48a85"))
 		elif selected:
 			_text("ВАШ ХОД", Vector2(228, top + 194), 12, Color("dfbd78"))
+
+
+func _draw_map_class_badge(hero, top: float) -> void:
+	var center := Vector2(269, top + 69)
+	draw_circle(center, 39.0, Color("3b3327"))
+	draw_arc(center, 39.0, 0.0, TAU, 40, Color("b89b63"), 2.0, true)
+	match hero.class_id():
+		"warrior": _draw_swords_icon(center, true)
+		"mage": _draw_fire_icon(center, true)
+		"cleric": _draw_heal_icon(center, true)
+		"archer": _draw_bow_icon(center, true)
+	_text(str(CLASS_NAMES.get(hero.class_id(), "ГЕРОЙ")).to_upper(), Vector2(219, top + 132), 15, Color("ddc993"), 110.0)
 
 
 func _draw_portrait(hero, rect: Rect2, index: int) -> void:
@@ -1069,12 +1149,22 @@ func _build_setup_overlay() -> void:
 	music_row.add_child(music_preview_button)
 	setup_notice = _label("", 17, Color("f1a09a"))
 	body.add_child(setup_notice)
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 14)
+	body.add_child(action_row)
+	var map_button := Button.new()
+	map_button.text = "КАРТА МИРА"
+	map_button.custom_minimum_size = Vector2(240, 66)
+	map_button.add_theme_font_size_override("font_size", 20)
+	map_button.pressed.connect(_open_map_from_setup)
+	action_row.add_child(map_button)
 	var start_button := Button.new()
 	start_button.text = "НАЧАТЬ БОЙ"
+	start_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	start_button.custom_minimum_size = Vector2(0, 66)
 	start_button.add_theme_font_size_override("font_size", 24)
 	start_button.pressed.connect(_begin_battle)
-	body.add_child(start_button)
+	action_row.add_child(start_button)
 
 
 func _build_log_panel() -> void:
@@ -1125,7 +1215,7 @@ func _label(value: String, size: int, color: Color) -> Label:
 	return label
 
 
-func _begin_battle() -> void:
+func _selected_hero_profiles() -> Array[Dictionary]:
 	var chosen_heroes: Array[Dictionary] = []
 	for class_id in CLASS_ORDER:
 		if hero_checks[class_id].button_pressed:
@@ -1133,6 +1223,49 @@ func _begin_battle() -> void:
 			var profile: Dictionary = catalog.hero_profile(class_id, level)
 			if not profile.is_empty():
 				chosen_heroes.append(profile)
+	return chosen_heroes
+
+
+func _open_map_from_setup() -> void:
+	var chosen_heroes: Array[Dictionary] = _selected_hero_profiles()
+	if chosen_heroes.is_empty():
+		setup_notice.text = "Выберите хотя бы одного героя."
+		return
+	map_heroes.clear()
+	for profile in chosen_heroes:
+		var hero = COMBATANT.new()
+		hero.initialize(profile, true, Vector2i.ZERO)
+		map_heroes.append(hero)
+	map_return_to_setup = true
+	map_mode = true
+	battle_audio.stop_preview()
+	music_preview_button.text = "ПРОСЛУШАТЬ"
+	setup_notice.text = ""
+	setup_overlay.hide()
+	queue_redraw()
+
+
+func _open_map_from_battle() -> void:
+	_cancel_targeting()
+	map_heroes = battle.heroes.duplicate()
+	map_return_to_setup = false
+	map_mode = true
+	battle_audio.set_audio_paused(true)
+	queue_redraw()
+
+
+func _close_map() -> void:
+	map_mode = false
+	map_heroes.clear()
+	if map_return_to_setup:
+		setup_overlay.show()
+	else:
+		battle_audio.set_audio_paused(false)
+	queue_redraw()
+
+
+func _begin_battle() -> void:
+	var chosen_heroes: Array[Dictionary] = _selected_hero_profiles()
 	if chosen_heroes.is_empty():
 		setup_notice.text = "Выберите хотя бы одного героя."
 		return
