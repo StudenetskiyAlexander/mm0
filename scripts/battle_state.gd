@@ -371,7 +371,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var distance: int = BOARD.attack_distance(attacker.cell, target.cell)
 	var range_penalty: int = maxi(0, distance - 5) * 3 if ranged else 0
 	var die := rng.randi_range(1, 20)
-	var attack_total := attacker.accuracy(ranged) + die - range_penalty
+	var attack_total: int = attacker.accuracy(ranged) + die - range_penalty
 	var armor_value: Variant = target.profile.get("armor", null)
 	var armor_name := "нет"
 	var armor_skill := 0
