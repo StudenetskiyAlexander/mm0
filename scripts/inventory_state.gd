@@ -2,6 +2,13 @@ extends RefCounted
 
 const GRID_SIZE := 10
 const SLOT_ORDER := ["right_hand", "left_hand", "body", "head", "back"]
+const SLOT_SIZE_CELLS := {
+	"right_hand": Vector2i(2, 3),
+	"left_hand": Vector2i(2, 3),
+	"body": Vector2i(2, 3),
+	"head": Vector2i(2, 2),
+	"back": Vector2i(2, 3)
+}
 
 
 static func equip(profile: Dictionary, inventory_index: int, definitions: Dictionary) -> bool:
@@ -58,19 +65,27 @@ static func _choose_slot(item: Dictionary, equipped: Dictionary, definitions: Di
 	var allowed: Array = item.get("equip_slots", [])
 	# Replacing an item of the same kind takes priority over an empty hand.
 	for slot in SLOT_ORDER:
-		if not allowed.has(slot):
+		if not allowed.has(slot) or not _fits_slot(item, str(slot)):
 			continue
 		var other_id: String = str(equipped.get(slot, ""))
 		var other_item: Dictionary = definitions.get(other_id, {})
 		if other_id != "" and _same_type(item, other_item):
 			return str(slot)
 	for slot in SLOT_ORDER:
-		if allowed.has(slot) and str(equipped.get(slot, "")) == "":
+		if allowed.has(slot) and _fits_slot(item, str(slot)) and str(equipped.get(slot, "")) == "":
 			return str(slot)
 	for slot in SLOT_ORDER:
-		if allowed.has(slot):
+		if allowed.has(slot) and _fits_slot(item, str(slot)):
 			return str(slot)
 	return ""
+
+
+static func _fits_slot(item: Dictionary, slot: String) -> bool:
+	var capacity: Vector2i = SLOT_SIZE_CELLS.get(slot, Vector2i.ZERO)
+	var size: Dictionary = item.get("size_cells", {})
+	var width: int = int(size.get("width", 0))
+	var height: int = int(size.get("height", 0))
+	return width > 0 and height > 0 and width <= capacity.x and height <= capacity.y
 
 
 static func _same_type(first: Dictionary, second: Dictionary) -> bool:

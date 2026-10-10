@@ -44,6 +44,7 @@ const SCREEN_SIZE := Vector2(1600, 1000)
 const MAP_VIEW_RECT := Rect2(364, 20, 1212, 960)
 const TOWN_SOURCE_POINTS := [Vector2(130, 433), Vector2(161, 407), Vector2(225, 382), Vector2(293, 397), Vector2(341, 433), Vector2(342, 475), Vector2(281, 498), Vector2(211, 494), Vector2(157, 472)]
 const HERO_SHEET_RECT := Rect2(375, 55, 1150, 890)
+const INVENTORY_CELL_SIZE := 50.0
 const HERO_SHEET_TAB_NAMES := ["ХАРАКТЕРИСТИКИ", "НАВЫКИ", "ИНВЕНТАРЬ", "СПОСОБНОСТИ"]
 const HERO_ATTRIBUTE_KEYS := ["strength", "dexterity", "endurance", "intelligence"]
 const HERO_ATTRIBUTE_NAMES := ["Сила", "Ловкость", "Выносливость", "Интеллект"]
@@ -474,14 +475,13 @@ func _draw_inventory_tab(hero) -> void:
 
 
 func _draw_inventory_grid() -> void:
-	var cell_size := 50.0
 	var grid_origin := Vector2(435, 210)
 	for row in range(10):
 		for column in range(10):
-			var cell := Rect2(grid_origin + Vector2(float(column) * cell_size, float(row) * cell_size), Vector2(cell_size, cell_size))
+			var cell := Rect2(grid_origin + Vector2(float(column), float(row)) * INVENTORY_CELL_SIZE, Vector2.ONE * INVENTORY_CELL_SIZE)
 			draw_rect(cell, Color("222c2a") if (row + column) % 2 == 0 else Color("1d2726"), true)
 			draw_rect(cell, Color("50594d"), false, 1.0)
-	draw_rect(Rect2(grid_origin, Vector2(500, 500)), Color("ac9362"), false, 2.0)
+	draw_rect(Rect2(grid_origin, Vector2.ONE * INVENTORY_CELL_SIZE * 10.0), Color("ac9362"), false, 2.0)
 
 
 func _draw_inventory_items(inventory: Array) -> void:
@@ -512,7 +512,7 @@ func _inventory_item_rect(entry: Dictionary, item: Dictionary) -> Rect2:
 	var height_cells: int = int(size_cells.get("height", 0))
 	if column < 0 or row < 0 or width_cells < 1 or height_cells < 1 or column + width_cells > 10 or row + height_cells > 10:
 		return Rect2()
-	return Rect2(Vector2(435 + column * 50, 210 + row * 50), Vector2(width_cells * 50, height_cells * 50))
+	return Rect2(Vector2(435, 210) + Vector2(column, row) * INVENTORY_CELL_SIZE, Vector2(width_cells, height_cells) * INVENTORY_CELL_SIZE)
 
 
 func _draw_inventory_description(hero, point: Vector2) -> void:
@@ -550,7 +550,7 @@ func _inventory_item_description(item: Dictionary, action_hint: String) -> Strin
 
 
 func _draw_equipment_area(hero) -> void:
-	var area := Rect2(995, 210, 470, 500)
+	var area := Rect2(995, 210, 470, 520)
 	draw_rect(area, Color("1b2425"), true)
 	draw_rect(area, Color("786a4d"), false, 2.0)
 	# A muted figure shows where the five empty equipment slots belong.
@@ -565,26 +565,35 @@ func _draw_equipment_area(hero) -> void:
 
 
 func _equipment_slot_specs() -> Array[Dictionary]:
+	var tall_slot_size := Vector2(2, 3) * INVENTORY_CELL_SIZE
+	var head_slot_size := Vector2(2, 2) * INVENTORY_CELL_SIZE
 	return [
-		{"id": "head", "rect": Rect2(1181, 228, 98, 82), "label": "ГОЛОВА", "description": "Слот для головного убора. Сейчас пуст."},
-		{"id": "body", "rect": Rect2(1181, 355, 98, 82), "label": "ТЕЛО", "description": "Слот для брони на тело. Сейчас пуст."},
-		{"id": "left_hand", "rect": Rect2(1015, 392, 98, 82), "label": "ЛЕВАЯ РУКА", "description": "Слот для предмета в левой руке. Сейчас пуст."},
-		{"id": "right_hand", "rect": Rect2(1347, 392, 98, 82), "label": "ПРАВАЯ РУКА", "description": "Слот для предмета в правой руке. Сейчас пуст."},
-		{"id": "back", "rect": Rect2(1347, 570, 98, 82), "label": "ЗА СПИНОЙ", "description": "Слот для лука за спиной. Сейчас пуст."}
+		{"id": "head", "rect": Rect2(Vector2(1180, 218), head_slot_size), "label": "ГОЛОВА", "description": "Слот для головного убора. Сейчас пуст."},
+		{"id": "body", "rect": Rect2(Vector2(1180, 355), tall_slot_size), "label": "ТЕЛО", "description": "Слот для брони на тело. Сейчас пуст."},
+		{"id": "left_hand", "rect": Rect2(Vector2(1020, 365), tall_slot_size), "label": "ЛЕВАЯ РУКА", "description": "Слот для предмета в левой руке. Сейчас пуст."},
+		{"id": "right_hand", "rect": Rect2(Vector2(1345, 365), tall_slot_size), "label": "ПРАВАЯ РУКА", "description": "Слот для предмета в правой руке. Сейчас пуст."},
+		{"id": "back", "rect": Rect2(Vector2(1345, 550), tall_slot_size), "label": "ЗА СПИНОЙ", "description": "Слот для лука за спиной. Сейчас пуст."}
 	]
 
 
 func _draw_equipment_slot(rect: Rect2, label: String, item: Dictionary) -> void:
 	draw_rect(rect, Color("202b2a"), true)
 	var hovered: bool = rect.has_point(get_local_mouse_position())
-	draw_rect(rect, Color("f5d58e") if hovered and not item.is_empty() else Color("a48c5e"), false, 3.0 if hovered and not item.is_empty() else 2.0)
-	draw_rect(Rect2(rect.position + Vector2(6, 6), rect.size - Vector2(12, 12)), Color("48544a"), false, 1.0)
 	if not item.is_empty():
+		var size_cells: Dictionary = item.get("size_cells", {})
+		var item_size := Vector2(int(size_cells.get("width", 0)), int(size_cells.get("height", 0))) * INVENTORY_CELL_SIZE
+		var item_rect := rect
+		if item_size.x > 0.0 and item_size.y > 0.0:
+			item_rect = Rect2(rect.position + (rect.size - item_size) * 0.5, item_size)
+		draw_rect(item_rect.grow(-2), Color("34332b"), true)
 		var texture: Texture2D = equipment_textures.get(str(item.get("id", "")), null)
 		if texture != null:
-			draw_texture_rect(texture, rect.grow(-7), false)
-	var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
-	_text(label, Vector2(rect.position.x + (rect.size.x - label_size.x) * 0.5, rect.end.y + 22), 14, Color("c8c3ae"))
+			draw_texture_rect(texture, item_rect.grow(-5), false)
+	else:
+		draw_rect(rect.grow(-6), Color("48544a"), false, 1.0)
+	draw_rect(rect, Color("f5d58e") if hovered and not item.is_empty() else Color("a48c5e"), false, 3.0 if hovered and not item.is_empty() else 2.0)
+	var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+	_text(label, Vector2(rect.position.x + (rect.size.x - label_size.x) * 0.5, rect.end.y + 20), 12, Color("c8c3ae"))
 
 
 func _draw_skill_group(title: String, skill_ids: Array, heading: Vector2, hero, hovered_skill: String) -> void:
