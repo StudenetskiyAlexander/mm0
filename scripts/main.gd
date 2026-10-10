@@ -527,7 +527,7 @@ func _draw_inventory_description(hero, point: Vector2) -> void:
 		_draw_hero_sheet_description("ПЕРЕДАЧА ПРЕДМЕТА", "Отпустите предмет на портрете другого героя.", "", "")
 		return
 	if inventory_notice != "":
-		_draw_hero_sheet_description("ПЕРЕДАЧА ПРЕДМЕТА", inventory_notice, "", "")
+		_draw_hero_sheet_description("ИНВЕНТАРЬ", inventory_notice, "", "")
 		return
 	var inventory: Array = hero.profile.get("inventory", [])
 	for entry in inventory:
@@ -536,7 +536,7 @@ func _draw_inventory_description(hero, point: Vector2) -> void:
 		var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
 		if item.is_empty() or not _inventory_item_rect(entry, item).has_point(point):
 			continue
-		_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — надеть; 1–4 или перетаскивание — передать."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
+		_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, _inventory_action_hint(hero, item, "Щелчок — надеть; 1–4 или перетаскивание — передать.")), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
 		return
 	for slot in _equipment_slot_specs():
 		var rect: Rect2 = slot["rect"]
@@ -545,7 +545,7 @@ func _draw_inventory_description(hero, point: Vector2) -> void:
 			if item.is_empty():
 				_draw_hero_sheet_description(str(slot["label"]), str(slot["description"]), "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Здесь появится его описание.")
 			else:
-				_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — снять; 1–4 или перетаскивание — передать."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
+				_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, _inventory_action_hint(hero, item, "Щелчок — снять; 1–4 или перетаскивание — передать.")), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
 			return
 	_draw_hero_sheet_description("", "", "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Наведите на предмет и нажмите 1–4, чтобы передать его герою.")
 
@@ -572,6 +572,14 @@ func _inventory_item_description(item: Dictionary, action_hint: String) -> Strin
 		var armor: Dictionary = item.get("armor", {})
 		return "Защита %+d. %s" % [int(armor.get("defense_bonus", 0)), description]
 	return description
+
+
+func _inventory_action_hint(hero, item: Dictionary, available_hint: String) -> String:
+	if INVENTORY_STATE.can_use(hero.profile, item):
+		return available_hint
+	var skill_id: String = INVENTORY_STATE.required_skill_id(item)
+	var skill_name: String = str(SKILLS.NAMES.get(skill_id, skill_id))
+	return "Нужен навык «%s»; предмет можно передать." % skill_name
 
 
 func _draw_equipment_area(hero) -> void:
@@ -793,6 +801,12 @@ func _activate_inventory_item(location: Dictionary) -> void:
 		party_profiles[source_index] = hero.profile.duplicate(true)
 		mouse_default_cursor_shape = Control.CURSOR_ARROW
 		queue_redraw()
+	elif slot == "":
+		var item: Dictionary = catalog.equipment_profile(str(location.get("item_id", "")))
+		if not item.is_empty() and not INVENTORY_STATE.can_use(hero.profile, item):
+			var skill_id: String = INVENTORY_STATE.required_skill_id(item)
+			inventory_notice = "Нужен навык «%s», чтобы надеть %s." % [str(SKILLS.NAMES.get(skill_id, skill_id)), str(item.get("name", "предмет"))]
+			queue_redraw()
 
 
 func _transfer_inventory_item(location: Dictionary, recipient_index: int) -> void:

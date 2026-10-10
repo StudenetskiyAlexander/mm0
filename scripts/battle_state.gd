@@ -6,6 +6,7 @@ signal visual_event(event: Dictionary)
 
 const BOARD = preload("res://scripts/battle_board.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
+const INVENTORY_STATE = preload("res://scripts/inventory_state.gd")
 const PROJECTILE_LAUNCH_DELAY := 0.32
 const ACTION_ANIMATION_TIME := 0.55
 const ENEMY_MOVE_CELLS_PER_TURN := 1
@@ -378,7 +379,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	if target.is_hero:
 		for slot in ["body", "head"]:
 			var equipped_armor: Dictionary = target.equipped_item(slot)
-			if str(equipped_armor.get("category", "")) == "armor":
+			if str(equipped_armor.get("category", "")) == "armor" and INVENTORY_STATE.can_use(target.profile, equipped_armor):
 				armor_name = str(equipped_armor.get("name", "Броня"))
 				break
 	else:

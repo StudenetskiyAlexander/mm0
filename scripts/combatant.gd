@@ -1,6 +1,7 @@
 extends RefCounted
 
 const SKILLS = preload("res://scripts/skill_catalog.gd")
+const INVENTORY_STATE = preload("res://scripts/inventory_state.gd")
 
 var profile: Dictionary = {}
 var equipment_definitions: Dictionary = {}
@@ -127,7 +128,7 @@ func armor_skill_bonus() -> int:
 		var bonus := 0
 		for slot in ["body", "head"]:
 			var armor_item: Dictionary = equipped_item(slot)
-			if str(armor_item.get("category", "")) != "armor":
+			if str(armor_item.get("category", "")) != "armor" or not INVENTORY_STATE.can_use(profile, armor_item):
 				continue
 			var armor_data: Dictionary = armor_item.get("armor", {})
 			var armor_type: String = str(armor_data.get("type", ""))
@@ -151,7 +152,7 @@ func armor_equipment_bonus() -> int:
 	var bonus := 0
 	for slot in ["body", "head"]:
 		var item: Dictionary = equipped_item(slot)
-		if str(item.get("category", "")) == "armor":
+		if str(item.get("category", "")) == "armor" and INVENTORY_STATE.can_use(profile, item):
 			var armor_data: Dictionary = item.get("armor", {})
 			bonus += int(armor_data.get("defense_bonus", 0))
 	return bonus
@@ -168,7 +169,7 @@ func equipped_weapon(ranged: bool = false) -> Dictionary:
 	var slots: Array = ["back"] if ranged else ["right_hand", "left_hand"]
 	for slot in slots:
 		var item: Dictionary = equipped_item(slot)
-		if str(item.get("category", "")) == "weapon":
+		if str(item.get("category", "")) == "weapon" and INVENTORY_STATE.can_use(profile, item):
 			return item
 	return {}
 

@@ -11,6 +11,25 @@ const SLOT_SIZE_CELLS := {
 }
 
 
+static func required_skill_id(item: Dictionary) -> String:
+	var category: String = str(item.get("category", ""))
+	if category == "weapon":
+		var weapon: Dictionary = item.get("weapon", {})
+		return str(weapon.get("type", ""))
+	if category == "armor":
+		var armor: Dictionary = item.get("armor", {})
+		return str(armor.get("type", ""))
+	return ""
+
+
+static func can_use(profile: Dictionary, item: Dictionary) -> bool:
+	var skill_id: String = required_skill_id(item)
+	if skill_id == "":
+		return false
+	var skills: Dictionary = profile.get("skills", {})
+	return int(skills.get(skill_id, 0)) > 0
+
+
 static func equip(profile: Dictionary, inventory_index: int, definitions: Dictionary) -> bool:
 	var inventory: Array = profile.get("inventory", [])
 	if inventory_index < 0 or inventory_index >= inventory.size():
@@ -18,7 +37,7 @@ static func equip(profile: Dictionary, inventory_index: int, definitions: Dictio
 	var entry: Dictionary = inventory[inventory_index]
 	var item_id: String = str(entry.get("item_id", ""))
 	var item: Dictionary = definitions.get(item_id, {})
-	if item.is_empty():
+	if item.is_empty() or not can_use(profile, item):
 		return false
 	var equipped: Dictionary = profile.get("equipped", {}).duplicate(true)
 	var target_slot: String = _choose_slot(item, equipped, definitions)
