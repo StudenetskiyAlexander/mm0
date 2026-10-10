@@ -410,13 +410,17 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		defense_parts.append("снаряжение %d" % armor_bonus)
 	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), attack_expression, attack_total, " + ".join(defense_parts), defense_total]
 	if hit:
-		var damage_dice := str(weapon.get("damage_dice", "1d4"))
-		var die_damage := _roll_dice(damage_dice)
+		var damage_dice: String = str(weapon.get("damage_dice", ""))
+		var base_damage: int = int(weapon.get("damage_flat", 0))
+		if damage_dice != "":
+			base_damage = _roll_dice(damage_dice)
 		var strength_bonus: int = 0 if ranged else attacker.attribute("strength")
-		damage = die_damage + strength_bonus
+		damage = base_damage + strength_bonus
 		var damage_parts := PackedStringArray()
-		if die_damage != 0:
-			damage_parts.append("%s (%d)" % [damage_dice, die_damage])
+		if damage_dice != "" and base_damage != 0:
+			damage_parts.append("%s (%d)" % [damage_dice, base_damage])
+		elif base_damage != 0:
+			damage_parts.append("без оружия (%d)" % base_damage)
 		if strength_bonus != 0:
 			damage_parts.append("Сила (%d)" % strength_bonus)
 		var damage_details: String = "Урон: %d" % damage

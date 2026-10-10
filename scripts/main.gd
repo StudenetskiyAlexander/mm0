@@ -55,7 +55,7 @@ const HERO_STAT_DESCRIPTIONS := {
 	"Выносливость": "Определяет максимум здоровья: 5 очков за каждую единицу.",
 	"Интеллект": "Определяет максимум маны: 5 очков за каждую единицу.",
 	"Точность удара": "Сила + бонусы надетого оружия и соответствующего навыка. При атаке добавляется 1д20.",
-	"Урон в ближнем бою": "Бросок урона оружия + Сила. Урон наносится при попадании.",
+	"Урон в ближнем бою": "Без оружия: 1 + Сила. С оружием: бросок урона оружия + Сила.",
 	"Точность выстрела": "Ловкость + бонусы надетого оружия и соответствующего навыка. После 5-й клетки штраф 3 за клетку.",
 	"Выстрел": "Бросок урона дальнобойного оружия без добавления Силы. Урон наносится при попадании.",
 	"Защита": "10 + ловкость + бонусы надетой брони и соответствующего навыка.",
@@ -424,8 +424,10 @@ func _draw_characteristics_tab(hero) -> void:
 	_text("БОЕВЫЕ ПОКАЗАТЕЛИ", Vector2(982, 182), 22, Color("e6cb83"))
 	draw_line(Vector2(980, 190), Vector2(1465, 190), Color("67583d"), 2.0, true)
 	_sheet_value_row("Точность удара", str(hero.accuracy()), _hero_derived_stat_row_rect(0), false, hovered_stat == "Точность удара")
-	var melee_dice: String = str(hero.weapon().get("damage_dice", "1d4")).replace("d", "д")
-	var melee_damage: String = melee_dice
+	var melee_weapon: Dictionary = hero.weapon()
+	var melee_damage: String = str(melee_weapon.get("damage_flat", 1))
+	if melee_weapon.has("damage_dice"):
+		melee_damage = str(melee_weapon.get("damage_dice", "")).replace("d", "д")
 	if hero.attribute("strength") != 0:
 		melee_damage += " + %d" % hero.attribute("strength")
 	_sheet_value_row("Урон в ближнем бою", melee_damage, _hero_derived_stat_row_rect(1), false, hovered_stat == "Урон в ближнем бою")
