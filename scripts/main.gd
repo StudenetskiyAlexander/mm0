@@ -7,6 +7,7 @@ const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
 const SKILLS = preload("res://scripts/skill_catalog.gd")
 const INVENTORY_STATE = preload("res://scripts/inventory_state.gd")
+const EQUIPMENT_ICON_BACKGROUND: Texture2D = preload("res://assets/equipment/inventory-backdrop.png")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const WORLD_MAP: Texture2D = preload("res://assets/world-map-preview.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
@@ -505,9 +506,23 @@ func _draw_inventory_items(inventory: Array) -> void:
 		var hovered: bool = item_rect.has_point(get_local_mouse_position())
 		draw_rect(item_rect.grow(-2), Color("34332b"), true)
 		draw_rect(item_rect.grow(-2), Color("f5d58e") if hovered else Color("d3ad68"), false, 3.0 if hovered else 2.0)
-		var item_texture: Texture2D = equipment_textures.get(item_id, null)
-		if item_texture != null:
-			draw_texture_rect(item_texture, item_rect.grow(-5), false)
+		_draw_equipment_icon(item_id, item_rect)
+
+
+func _draw_equipment_icon(item_id: String, rect: Rect2, opacity: float = 1.0) -> void:
+	var texture: Texture2D = equipment_textures.get(item_id, null)
+	if texture == null:
+		return
+	var inner_rect: Rect2 = rect.grow(-5)
+	var tint := Color(1.0, 1.0, 1.0, opacity)
+	draw_texture_rect(EQUIPMENT_ICON_BACKGROUND, inner_rect, false, tint)
+	var source_size: Vector2 = texture.get_size()
+	if source_size.x <= 0.0 or source_size.y <= 0.0:
+		return
+	var scale: float = minf(inner_rect.size.x / source_size.x, inner_rect.size.y / source_size.y)
+	var drawn_size: Vector2 = source_size * scale
+	var drawn_rect := Rect2(inner_rect.position + (inner_rect.size - drawn_size) * 0.5, drawn_size)
+	draw_texture_rect(texture, drawn_rect, false, tint)
 
 
 func _inventory_item_rect(entry: Dictionary, item: Dictionary) -> Rect2:
@@ -553,13 +568,12 @@ func _draw_inventory_description(hero, point: Vector2) -> void:
 func _draw_inventory_drag_preview() -> void:
 	var item_id: String = str(inventory_press.get("item_id", ""))
 	var item: Dictionary = catalog.equipment_profile(item_id)
-	var texture: Texture2D = equipment_textures.get(item_id, null)
-	if item.is_empty() or texture == null:
+	if item.is_empty() or not equipment_textures.has(item_id):
 		return
 	var size_cells: Dictionary = item.get("size_cells", {})
 	var item_size := Vector2(int(size_cells.get("width", 0)), int(size_cells.get("height", 0))) * INVENTORY_CELL_SIZE
 	var rect := Rect2(get_local_mouse_position() - item_size * 0.5, item_size)
-	draw_texture_rect(texture, rect.grow(-5), false, Color(1.0, 1.0, 1.0, 0.78))
+	_draw_equipment_icon(item_id, rect, 0.78)
 
 
 func _inventory_item_description(item: Dictionary, action_hint: String) -> String:
@@ -619,9 +633,7 @@ func _draw_equipment_slot(rect: Rect2, label: String, item: Dictionary) -> void:
 		if item_size.x > 0.0 and item_size.y > 0.0:
 			item_rect = Rect2(rect.position + (rect.size - item_size) * 0.5, item_size)
 		draw_rect(item_rect.grow(-2), Color("34332b"), true)
-		var texture: Texture2D = equipment_textures.get(str(item.get("id", "")), null)
-		if texture != null:
-			draw_texture_rect(texture, item_rect.grow(-5), false)
+		_draw_equipment_icon(str(item.get("id", "")), item_rect)
 	else:
 		draw_rect(rect.grow(-6), Color("48544a"), false, 1.0)
 	draw_rect(rect, Color("f5d58e") if hovered and not item.is_empty() else Color("a48c5e"), false, 3.0 if hovered and not item.is_empty() else 2.0)
