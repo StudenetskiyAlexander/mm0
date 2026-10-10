@@ -18,7 +18,8 @@
   },
   "skills": {
     "staff": 4,
-    "cloth_armor": 4
+    "cloth_armor": 4,
+    "fire_magic": 1
   },
   "unspent_attribute_points": 0,
   "unspent_skill_points": 0,

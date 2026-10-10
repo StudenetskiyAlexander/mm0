@@ -16,7 +16,9 @@
     "endurance": 3,
     "intelligence": 3
   },
-  "skills": {},
+  "skills": {
+    "fire_magic": 1
+  },
   "unspent_attribute_points": 0,
   "unspent_skill_points": 0,
   "armor": {

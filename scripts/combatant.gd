@@ -1,5 +1,7 @@
 extends RefCounted
 
+const SKILLS = preload("res://scripts/skill_catalog.gd")
+
 var profile: Dictionary = {}
 var is_hero := false
 var cell := Vector2i.ZERO
@@ -41,6 +43,32 @@ func attribute(key: String) -> int:
 func skill(key: String) -> int:
 	var skills: Dictionary = profile.get("skills", {})
 	return int(skills.get(key, 0))
+
+
+func skill_points() -> int:
+	return int(profile.get("unspent_skill_points", 0))
+
+
+func skill_upgrade_cost(key: String) -> int:
+	if not SKILLS.ALL_IDS.has(key):
+		return 0
+	return skill(key) + 1
+
+
+func can_upgrade_skill(key: String) -> bool:
+	var cost: int = skill_upgrade_cost(key)
+	return is_hero and cost > 0 and skill_points() >= cost
+
+
+func spend_skill_points(key: String) -> bool:
+	if not can_upgrade_skill(key):
+		return false
+	var cost: int = skill_upgrade_cost(key)
+	var skills: Dictionary = profile.get("skills", {})
+	skills[key] = skill(key) + 1
+	profile["skills"] = skills
+	profile["unspent_skill_points"] = skill_points() - cost
+	return true
 
 
 func max_health() -> int:
