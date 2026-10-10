@@ -45,6 +45,20 @@ const HERO_SHEET_RECT := Rect2(375, 55, 1150, 890)
 const HERO_SHEET_TAB_NAMES := ["ХАРАКТЕРИСТИКИ", "НАВЫКИ", "ИНВЕНТАРЬ", "СПОСОБНОСТИ"]
 const HERO_ATTRIBUTE_KEYS := ["strength", "dexterity", "endurance", "intelligence"]
 const HERO_ATTRIBUTE_NAMES := ["Сила", "Ловкость", "Выносливость", "Интеллект"]
+const HERO_DERIVED_STAT_NAMES := ["Точность удара", "Точность выстрела", "Защита", "Текущее здоровье", "Максимум здоровья", "Текущая мана", "Максимум маны"]
+const HERO_STAT_DESCRIPTIONS := {
+	"Сила": "Повышает точность и урон атак оружием ближнего боя.",
+	"Ловкость": "Повышает точность выстрелов и защиту.",
+	"Выносливость": "Определяет максимум здоровья: 5 очков за каждую единицу.",
+	"Интеллект": "Определяет максимум маны: 5 очков за каждую единицу.",
+	"Точность удара": "Сила + навык оружия + бонус оружия. При атаке добавляется бросок 1д20.",
+	"Точность выстрела": "Ловкость + навык оружия + бонус оружия. После 5-й клетки штраф 3 за клетку.",
+	"Защита": "10 + ловкость + навык брони + бонус снаряжения. Атака попадает при равенстве или превышении.",
+	"Текущее здоровье": "Оставшееся здоровье. При 0 герой теряет сознание, при значении ниже −10 погибает.",
+	"Максимум здоровья": "Верхний предел здоровья, равный 5 × Выносливость.",
+	"Текущая мана": "Оставшаяся мана для заклинаний.",
+	"Максимум маны": "Верхний предел маны, равный 5 × Интеллект."
+}
 const BATTLE_MAP_RECT := Rect2(1112, 12, 151, 69)
 const PREVIEW_GOLD_TEXT := "12 450"
 const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
@@ -369,53 +383,86 @@ func _draw_hero_sheet() -> void:
 
 
 func _draw_characteristics_tab(hero) -> void:
-	_text("ГЕРОЙ", Vector2(437, 130), 22, Color("e6cb83"))
-	draw_line(Vector2(435, 139), Vector2(915, 139), Color("67583d"), 2.0, true)
-	_sheet_value_row("Имя", hero.name(), Rect2(435, 151, 480, 47))
-	_sheet_value_row("Класс", str(CLASS_NAMES.get(hero.class_id(), "Герой")), Rect2(435, 203, 480, 47))
-	_sheet_value_row("Уровень", str(hero.profile.get("level", 1)), Rect2(435, 255, 480, 47))
-	_sheet_value_row("Текущий опыт", "0", Rect2(435, 307, 480, 47))
-	_sheet_value_row("До следующего уровня", "0", Rect2(435, 359, 480, 47))
-	_sheet_value_row("Свободные очки характеристик", str(hero.attribute_points()), Rect2(435, 411, 480, 47), true)
-	_text("ОСНОВНЫЕ ХАРАКТЕРИСТИКИ", Vector2(437, 502), 21, Color("e6cb83"))
-	draw_line(Vector2(435, 511), Vector2(915, 511), Color("67583d"), 2.0, true)
+	var hero_title: String = "%s, %s %d уровня" % [hero.name(), str(CLASS_NAMES.get(hero.class_id(), "Герой")).to_lower(), int(hero.profile.get("level", 1))]
+	_text(hero_title, Vector2(437, 132), 26, Color("e6cb83"), 1028.0)
+	draw_line(Vector2(435, 149), Vector2(1465, 149), Color("67583d"), 2.0, true)
+	_sheet_value_row("Текущий опыт", "0", Rect2(435, 195, 480, 47))
+	_sheet_value_row("До следующего уровня", "0", Rect2(435, 247, 480, 47))
+	_sheet_value_row("Свободные очки характеристик", str(hero.attribute_points()), Rect2(435, 299, 480, 47), true)
+	_text("ОСНОВНЫЕ ХАРАКТЕРИСТИКИ", Vector2(437, 394), 21, Color("e6cb83"))
+	draw_line(Vector2(435, 402), Vector2(915, 402), Color("67583d"), 2.0, true)
+	var hovered_stat: String = _hovered_hero_stat(get_local_mouse_position())
 	for index in range(HERO_ATTRIBUTE_KEYS.size()):
-		var row := Rect2(435, 520 + float(index) * 64.0, 480, 57)
-		draw_rect(row, Color("202a2b"), true)
-		draw_rect(row, Color("4d5448"), false, 1.0)
+		var row: Rect2 = _hero_attribute_row_rect(index)
+		var hovered: bool = hovered_stat == HERO_ATTRIBUTE_NAMES[index]
+		draw_rect(row, Color("2c3634") if hovered else Color("202a2b"), true)
+		draw_rect(row, Color("a58c5b") if hovered else Color("4d5448"), false, 1.0)
 		_text(HERO_ATTRIBUTE_NAMES[index], row.position + Vector2(16, 37), 20, Color("e5e1d2"))
 		_text(str(hero.attribute(HERO_ATTRIBUTE_KEYS[index])), row.position + Vector2(360, 37), 23, Color("f5db9b"))
 		var plus_rect := _hero_attribute_plus_rect(index)
 		var can_spend: bool = hero.attribute_points() > 0
-		var hovered: bool = can_spend and plus_rect.has_point(get_local_mouse_position())
-		draw_rect(plus_rect, Color("536943") if hovered else (Color("384f3a") if can_spend else Color("303637")), true)
-		draw_rect(plus_rect, Color("f3d98f") if hovered else (Color("b8a36e") if can_spend else Color("64665f")), false, 2.0)
+		var plus_hovered: bool = can_spend and plus_rect.has_point(get_local_mouse_position())
+		draw_rect(plus_rect, Color("536943") if plus_hovered else (Color("384f3a") if can_spend else Color("303637")), true)
+		draw_rect(plus_rect, Color("f3d98f") if plus_hovered else (Color("b8a36e") if can_spend else Color("64665f")), false, 2.0)
 		_text("+", plus_rect.position + Vector2(16, 30), 25, Color("fff0bc") if can_spend else Color("777c77"))
-	draw_line(Vector2(950, 113), Vector2(950, 795), Color("4e4938"), 2.0, true)
-	_text("БОЕВЫЕ ПОКАЗАТЕЛИ", Vector2(982, 130), 22, Color("e6cb83"))
-	draw_line(Vector2(980, 139), Vector2(1465, 139), Color("67583d"), 2.0, true)
-	_sheet_value_row("Точность удара", str(hero.accuracy()), Rect2(980, 151, 485, 53))
+	draw_line(Vector2(950, 175), Vector2(950, 716), Color("4e4938"), 2.0, true)
+	_text("БОЕВЫЕ ПОКАЗАТЕЛИ", Vector2(982, 182), 22, Color("e6cb83"))
+	draw_line(Vector2(980, 190), Vector2(1465, 190), Color("67583d"), 2.0, true)
+	_sheet_value_row("Точность удара", str(hero.accuracy()), _hero_derived_stat_row_rect(0), false, hovered_stat == "Точность удара")
 	var ranged_accuracy := str(hero.accuracy(true)) if hero.has_action("shoot") else "—"
-	_sheet_value_row("Точность выстрела", ranged_accuracy, Rect2(980, 213, 485, 53))
-	_sheet_value_row("Защита", str(hero.defense()), Rect2(980, 275, 485, 53))
-	_text("Точность указана без броска 1д20", Vector2(996, 353), 15, Color("a9ab9e"))
-	_text("ЗДОРОВЬЕ И МАНА", Vector2(982, 403), 22, Color("e6cb83"))
-	draw_line(Vector2(980, 412), Vector2(1465, 412), Color("67583d"), 2.0, true)
-	_sheet_value_row("Текущее здоровье", str(hero.health), Rect2(980, 425, 485, 53))
-	_sheet_value_row("Максимум здоровья", str(hero.max_health()), Rect2(980, 487, 485, 53))
-	_sheet_value_row("Текущая мана", str(hero.mana), Rect2(980, 549, 485, 53))
-	_sheet_value_row("Максимум маны", str(hero.max_mana()), Rect2(980, 611, 485, 53))
+	_sheet_value_row("Точность выстрела", ranged_accuracy, _hero_derived_stat_row_rect(1), false, hovered_stat == "Точность выстрела")
+	_sheet_value_row("Защита", str(hero.defense()), _hero_derived_stat_row_rect(2), false, hovered_stat == "Защита")
+	_text("Точность указана без броска 1д20", Vector2(996, 405), 15, Color("a9ab9e"))
+	_text("ЗДОРОВЬЕ И МАНА", Vector2(982, 462), 22, Color("e6cb83"))
+	draw_line(Vector2(980, 470), Vector2(1465, 470), Color("67583d"), 2.0, true)
+	_sheet_value_row("Текущее здоровье", str(hero.health), _hero_derived_stat_row_rect(3), false, hovered_stat == "Текущее здоровье")
+	_sheet_value_row("Максимум здоровья", str(hero.max_health()), _hero_derived_stat_row_rect(4), false, hovered_stat == "Максимум здоровья")
+	_sheet_value_row("Текущая мана", str(hero.mana), _hero_derived_stat_row_rect(5), false, hovered_stat == "Текущая мана")
+	_sheet_value_row("Максимум маны", str(hero.max_mana()), _hero_derived_stat_row_rect(6), false, hovered_stat == "Максимум маны")
+	_draw_hero_stat_description(hovered_stat)
 
 
-func _sheet_value_row(label: String, value: String, rect: Rect2, highlight: bool = false) -> void:
-	draw_rect(rect, Color("2a3229") if highlight else Color("202a2b"), true)
-	draw_rect(rect, Color("8d794e") if highlight else Color("4d5448"), false, 1.0)
+func _sheet_value_row(label: String, value: String, rect: Rect2, highlight: bool = false, hovered: bool = false) -> void:
+	draw_rect(rect, Color("2a3229") if highlight else (Color("2c3634") if hovered else Color("202a2b")), true)
+	draw_rect(rect, Color("8d794e") if highlight else (Color("a58c5b") if hovered else Color("4d5448")), false, 1.0)
 	_text(label, rect.position + Vector2(16, 32), 18, Color("e5e1d2"), rect.size.x - 130.0)
 	_text(value, Vector2(rect.end.x - 96, rect.position.y + 33), 21, Color("f5db9b") if highlight else Color("f0e9d7"), 88.0)
 
 
+func _hero_attribute_row_rect(index: int) -> Rect2:
+	return Rect2(435, 410 + float(index) * 62.0, 480, 57)
+
+
+func _hero_derived_stat_row_rect(index: int) -> Rect2:
+	if index < 3:
+		return Rect2(980, 195 + float(index) * 62.0, 485, 53)
+	return Rect2(980, 475 + float(index - 3) * 62.0, 485, 53)
+
+
+func _hovered_hero_stat(point: Vector2) -> String:
+	for index in range(HERO_ATTRIBUTE_NAMES.size()):
+		if _hero_attribute_row_rect(index).has_point(point):
+			return HERO_ATTRIBUTE_NAMES[index]
+	for index in range(HERO_DERIVED_STAT_NAMES.size()):
+		if _hero_derived_stat_row_rect(index).has_point(point):
+			return HERO_DERIVED_STAT_NAMES[index]
+	return ""
+
+
+func _draw_hero_stat_description(stat_name: String) -> void:
+	var rect := Rect2(405, 738, 1090, 87)
+	draw_rect(rect, Color("202a2b"), true)
+	draw_rect(rect, Color("8d794e"), false, 2.0)
+	if stat_name == "":
+		_text("НАВЕДИТЕ НА ХАРАКТЕРИСТИКУ", Vector2(425, 769), 18, Color("e6cb83"))
+		_text("Здесь появится описание её влияния на героя.", Vector2(425, 801), 18, Color("b9b6a9"))
+	else:
+		_text(stat_name.to_upper(), Vector2(425, 769), 18, Color("e6cb83"))
+		_text(str(HERO_STAT_DESCRIPTIONS.get(stat_name, "")), Vector2(425, 801), 18, Color("f0e9d7"), 1045.0)
+
+
 func _hero_attribute_plus_rect(index: int) -> Rect2:
-	return Rect2(850, 527 + float(index) * 64.0, 48, 43)
+	return Rect2(850, 417 + float(index) * 62.0, 48, 43)
 
 
 func _hero_sheet_tab_rect(index: int) -> Rect2:
