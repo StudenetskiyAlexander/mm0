@@ -6,21 +6,21 @@
   "level": 3,
   "level_up_attribute_allocations": {
     "strength": 2,
-    "dexterity": 1,
-    "endurance": 2,
-    "intelligence": 1
+    "dexterity": 0,
+    "endurance": 1,
+    "intelligence": 0
   },
   "attributes": {
     "strength": 5,
-    "dexterity": 4,
-    "endurance": 5,
-    "intelligence": 4
+    "dexterity": 3,
+    "endurance": 4,
+    "intelligence": 3
   },
   "skills": {
     "sword": 3,
     "chain_armor": 2
   },
-  "unspent_attribute_points": 0,
+  "unspent_attribute_points": 3,
   "unspent_skill_points": 1,
   "armor": {
     "name": "Кольчуга",

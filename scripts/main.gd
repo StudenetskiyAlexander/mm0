@@ -43,6 +43,8 @@ const MAP_VIEW_RECT := Rect2(364, 20, 1212, 960)
 const TOWN_SOURCE_POINTS := [Vector2(130, 433), Vector2(161, 407), Vector2(225, 382), Vector2(293, 397), Vector2(341, 433), Vector2(342, 475), Vector2(281, 498), Vector2(211, 494), Vector2(157, 472)]
 const HERO_SHEET_RECT := Rect2(375, 55, 1150, 890)
 const HERO_SHEET_TAB_NAMES := ["ХАРАКТЕРИСТИКИ", "НАВЫКИ", "ИНВЕНТАРЬ", "СПОСОБНОСТИ"]
+const HERO_ATTRIBUTE_KEYS := ["strength", "dexterity", "endurance", "intelligence"]
+const HERO_ATTRIBUTE_NAMES := ["Сила", "Ловкость", "Выносливость", "Интеллект"]
 const BATTLE_MAP_RECT := Rect2(1112, 12, 151, 69)
 const PREVIEW_GOLD_TEXT := "12 450"
 const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
@@ -354,6 +356,8 @@ func _draw_hero_sheet() -> void:
 	draw_rect(HERO_SHEET_RECT, Color("c2a86f"), false, 4.0)
 	draw_rect(Rect2(405, 85, 1090, 740), Color("111719"), true)
 	draw_rect(Rect2(405, 85, 1090, 740), Color("665b42"), false, 2.0)
+	if hero_sheet_tab == 0:
+		_draw_characteristics_tab(map_heroes[hero_sheet_index])
 	for index in range(HERO_SHEET_TAB_NAMES.size()):
 		var rect := _hero_sheet_tab_rect(index)
 		var selected: bool = index == hero_sheet_tab
@@ -362,6 +366,56 @@ func _draw_hero_sheet() -> void:
 		if selected:
 			draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 6), Vector2(rect.size.x - 4, 4)), Color("edcf83"), true)
 		_text(HERO_SHEET_TAB_NAMES[index], rect.position + Vector2(13, 40), 19, Color("ffebbc") if selected else Color("b9b6a9"), rect.size.x - 22)
+
+
+func _draw_characteristics_tab(hero) -> void:
+	_text("ГЕРОЙ", Vector2(437, 130), 22, Color("e6cb83"))
+	draw_line(Vector2(435, 139), Vector2(915, 139), Color("67583d"), 2.0, true)
+	_sheet_value_row("Имя", hero.name(), Rect2(435, 151, 480, 47))
+	_sheet_value_row("Класс", str(CLASS_NAMES.get(hero.class_id(), "Герой")), Rect2(435, 203, 480, 47))
+	_sheet_value_row("Уровень", str(hero.profile.get("level", 1)), Rect2(435, 255, 480, 47))
+	_sheet_value_row("Текущий опыт", "0", Rect2(435, 307, 480, 47))
+	_sheet_value_row("До следующего уровня", "0", Rect2(435, 359, 480, 47))
+	_sheet_value_row("Свободные очки характеристик", str(hero.attribute_points()), Rect2(435, 411, 480, 47), true)
+	_text("ОСНОВНЫЕ ХАРАКТЕРИСТИКИ", Vector2(437, 502), 21, Color("e6cb83"))
+	draw_line(Vector2(435, 511), Vector2(915, 511), Color("67583d"), 2.0, true)
+	for index in range(HERO_ATTRIBUTE_KEYS.size()):
+		var row := Rect2(435, 520 + float(index) * 64.0, 480, 57)
+		draw_rect(row, Color("202a2b"), true)
+		draw_rect(row, Color("4d5448"), false, 1.0)
+		_text(HERO_ATTRIBUTE_NAMES[index], row.position + Vector2(16, 37), 20, Color("e5e1d2"))
+		_text(str(hero.attribute(HERO_ATTRIBUTE_KEYS[index])), row.position + Vector2(360, 37), 23, Color("f5db9b"))
+		var plus_rect := _hero_attribute_plus_rect(index)
+		var can_spend: bool = hero.attribute_points() > 0
+		var hovered: bool = can_spend and plus_rect.has_point(get_local_mouse_position())
+		draw_rect(plus_rect, Color("536943") if hovered else (Color("384f3a") if can_spend else Color("303637")), true)
+		draw_rect(plus_rect, Color("f3d98f") if hovered else (Color("b8a36e") if can_spend else Color("64665f")), false, 2.0)
+		_text("+", plus_rect.position + Vector2(16, 30), 25, Color("fff0bc") if can_spend else Color("777c77"))
+	draw_line(Vector2(950, 113), Vector2(950, 795), Color("4e4938"), 2.0, true)
+	_text("БОЕВЫЕ ПОКАЗАТЕЛИ", Vector2(982, 130), 22, Color("e6cb83"))
+	draw_line(Vector2(980, 139), Vector2(1465, 139), Color("67583d"), 2.0, true)
+	_sheet_value_row("Точность удара", str(hero.accuracy()), Rect2(980, 151, 485, 53))
+	var ranged_accuracy := str(hero.accuracy(true)) if hero.has_action("shoot") else "—"
+	_sheet_value_row("Точность выстрела", ranged_accuracy, Rect2(980, 213, 485, 53))
+	_sheet_value_row("Защита", str(hero.defense()), Rect2(980, 275, 485, 53))
+	_text("Точность указана без броска 1д20", Vector2(996, 353), 15, Color("a9ab9e"))
+	_text("ЗДОРОВЬЕ И МАНА", Vector2(982, 403), 22, Color("e6cb83"))
+	draw_line(Vector2(980, 412), Vector2(1465, 412), Color("67583d"), 2.0, true)
+	_sheet_value_row("Текущее здоровье", str(hero.health), Rect2(980, 425, 485, 53))
+	_sheet_value_row("Максимум здоровья", str(hero.max_health()), Rect2(980, 487, 485, 53))
+	_sheet_value_row("Текущая мана", str(hero.mana), Rect2(980, 549, 485, 53))
+	_sheet_value_row("Максимум маны", str(hero.max_mana()), Rect2(980, 611, 485, 53))
+
+
+func _sheet_value_row(label: String, value: String, rect: Rect2, highlight: bool = false) -> void:
+	draw_rect(rect, Color("2a3229") if highlight else Color("202a2b"), true)
+	draw_rect(rect, Color("8d794e") if highlight else Color("4d5448"), false, 1.0)
+	_text(label, rect.position + Vector2(16, 32), 18, Color("e5e1d2"), rect.size.x - 130.0)
+	_text(value, Vector2(rect.end.x - 96, rect.position.y + 33), 21, Color("f5db9b") if highlight else Color("f0e9d7"), 88.0)
+
+
+func _hero_attribute_plus_rect(index: int) -> Rect2:
+	return Rect2(850, 527 + float(index) * 64.0, 48, 43)
 
 
 func _hero_sheet_tab_rect(index: int) -> Rect2:
@@ -403,6 +457,19 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 			hero_sheet_tab = posmod(hero_sheet_tab + 1, HERO_SHEET_TAB_NAMES.size())
 			queue_redraw()
 		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion:
+		var clickable := false
+		for index in range(HERO_SHEET_TAB_NAMES.size()):
+			if _hero_sheet_tab_rect(index).has_point(event.position):
+				clickable = true
+				break
+		if hero_sheet_tab == 0 and map_heroes[hero_sheet_index].attribute_points() > 0:
+			for index in range(HERO_ATTRIBUTE_KEYS.size()):
+				if _hero_attribute_plus_rect(index).has_point(event.position):
+					clickable = true
+					break
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if clickable else Control.CURSOR_ARROW
+		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if not HERO_SHEET_RECT.has_point(event.position):
 			_close_hero_sheet()
@@ -411,7 +478,16 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 				if _hero_sheet_tab_rect(index).has_point(event.position):
 					hero_sheet_tab = index
 					queue_redraw()
-					break
+					get_viewport().set_input_as_handled()
+					return
+			if hero_sheet_tab == 0:
+				for index in range(HERO_ATTRIBUTE_KEYS.size()):
+					if _hero_attribute_plus_rect(index).has_point(event.position):
+						var hero = map_heroes[hero_sheet_index]
+						if hero.spend_attribute_point(HERO_ATTRIBUTE_KEYS[index]):
+							party_profiles[hero_sheet_index] = hero.profile.duplicate(true)
+							queue_redraw()
+						break
 		get_viewport().set_input_as_handled()
 
 
@@ -1322,7 +1398,11 @@ func _selected_hero_profiles() -> Array[Dictionary]:
 			var level: int = hero_levels[class_id].get_selected_id()
 			var profile: Dictionary = catalog.hero_profile(class_id, level)
 			if not profile.is_empty():
-				chosen_heroes.append(profile)
+				for previous_profile in party_profiles:
+					if str(previous_profile.get("id", "")) == str(profile.get("id", "")):
+						profile = previous_profile
+						break
+				chosen_heroes.append(profile.duplicate(true))
 	return chosen_heroes
 
 

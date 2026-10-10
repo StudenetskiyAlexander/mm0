@@ -51,6 +51,35 @@ func max_mana() -> int:
 	return 5 * attribute("intelligence")
 
 
+func attribute_points() -> int:
+	return int(profile.get("unspent_attribute_points", 0))
+
+
+func spend_attribute_point(key: String) -> bool:
+	if not is_hero or attribute_points() <= 0 or not ["strength", "dexterity", "endurance", "intelligence"].has(key):
+		return false
+	var points_before := attribute_points()
+	var old_max_health := max_health()
+	var old_max_mana := max_mana()
+	var attributes: Dictionary = profile.get("attributes", {})
+	attributes[key] = int(attributes.get(key, 0)) + 1
+	profile["attributes"] = attributes
+	var allocations: Dictionary = profile.get("level_up_attribute_allocations", {})
+	allocations[key] = int(allocations.get(key, 0)) + 1
+	profile["level_up_attribute_allocations"] = allocations
+	profile["unspent_attribute_points"] = points_before - 1
+	if health > 0:
+		health += max_health() - old_max_health
+	mana += max_mana() - old_max_mana
+	return true
+
+
+func accuracy(ranged: bool = false) -> int:
+	var attack_weapon: Dictionary = weapon(ranged)
+	var attribute_key := "dexterity" if ranged else "strength"
+	return attribute(attribute_key) + skill(str(attack_weapon.get("skill_id", ""))) + int(attack_weapon.get("accuracy_bonus", 0))
+
+
 func defense() -> int:
 	var armor_value: Variant = profile.get("armor", null)
 	var armor_skill := 0

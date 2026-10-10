@@ -5,22 +5,22 @@
   "race_id": "human",
   "level": 3,
   "level_up_attribute_allocations": {
-    "strength": 1,
-    "dexterity": 1,
-    "endurance": 2,
+    "strength": 0,
+    "dexterity": 0,
+    "endurance": 1,
     "intelligence": 2
   },
   "attributes": {
-    "strength": 4,
-    "dexterity": 4,
-    "endurance": 5,
+    "strength": 3,
+    "dexterity": 3,
+    "endurance": 4,
     "intelligence": 5
   },
   "skills": {
     "mace": 3,
     "chain_armor": 2
   },
-  "unspent_attribute_points": 0,
+  "unspent_attribute_points": 3,
   "unspent_skill_points": 1,
   "armor": {
     "name": "Кольчуга",
