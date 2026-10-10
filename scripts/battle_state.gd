@@ -28,7 +28,7 @@ var won := false
 var rng := RandomNumberGenerator.new()
 
 
-func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]) -> void:
+func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary], equipment_definitions: Dictionary = {}) -> void:
 	rng.randomize()
 	heroes.clear()
 	enemies.clear()
@@ -48,7 +48,7 @@ func start(hero_profiles: Array[Dictionary], selected_enemies: Array[Dictionary]
 	ended = false
 	for index in range(hero_profiles.size()):
 		var unit = COMBATANT.new()
-		unit.initialize(hero_profiles[index], true, Vector2i(0, BOARD.HERO_ROWS[index]))
+		unit.initialize(hero_profiles[index], true, Vector2i(0, BOARD.HERO_ROWS[index]), equipment_definitions)
 		heroes.append(unit)
 	_log("Бой начался. Герои: %d; выбрано врагов: %d." % [heroes.size(), enemies_remaining_to_spawn])
 	_begin_round()
@@ -372,12 +372,19 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var range_penalty: int = maxi(0, distance - 5) * 3 if ranged else 0
 	var die := rng.randi_range(1, 20)
 	var attack_total: int = attacker.accuracy(ranged) + die - range_penalty
-	var armor_value: Variant = target.profile.get("armor", null)
-	var armor_name := "нет"
-	var armor_skill := 0
-	if armor_value is Dictionary:
-		armor_name = str(armor_value.get("name", "Броня"))
-		armor_skill = target.armor_skill_bonus()
+	var armor_name := "Броня"
+	if target.is_hero:
+		for slot in ["body", "head"]:
+			var equipped_armor: Dictionary = target.equipped_item(slot)
+			if str(equipped_armor.get("category", "")) == "armor":
+				armor_name = str(equipped_armor.get("name", "Броня"))
+				break
+	else:
+		var armor_value: Variant = target.profile.get("armor", null)
+		if armor_value is Dictionary:
+			armor_name = str(armor_value.get("name", "Броня"))
+	var armor_skill: int = target.armor_skill_bonus()
+	var armor_bonus: int = target.armor_equipment_bonus()
 	var target_dexterity: int = target.attribute("dexterity")
 	var defense_total: int = target.defense()
 	var action_name := "стреляет в" if ranged else "атакует"
@@ -399,6 +406,8 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		defense_parts.append("Ловкость %d" % target_dexterity)
 	if armor_skill != 0:
 		defense_parts.append("%s %d" % [armor_name, armor_skill])
+	if armor_bonus != 0:
+		defense_parts.append("снаряжение %d" % armor_bonus)
 	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), attack_expression, attack_total, " + ".join(defense_parts), defense_total]
 	if hit:
 		var damage_dice := str(weapon.get("damage_dice", "1d4"))

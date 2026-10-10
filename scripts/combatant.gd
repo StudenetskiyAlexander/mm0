@@ -3,6 +3,7 @@ extends RefCounted
 const SKILLS = preload("res://scripts/skill_catalog.gd")
 
 var profile: Dictionary = {}
+var equipment_definitions: Dictionary = {}
 var is_hero := false
 var cell := Vector2i.ZERO
 var health := 0
@@ -11,8 +12,9 @@ var health_potions := 0
 var mana_potions := 0
 
 
-func initialize(source: Dictionary, hero: bool, starting_cell: Vector2i) -> void:
+func initialize(source: Dictionary, hero: bool, starting_cell: Vector2i, definitions: Dictionary = {}) -> void:
 	profile = source.duplicate(true)
+	equipment_definitions = definitions
 	is_hero = hero
 	cell = starting_cell
 	health = max_health()
@@ -108,20 +110,31 @@ func accuracy(ranged: bool = false) -> int:
 
 
 func weapon_skill_bonus(ranged: bool = false) -> int:
-	if is_hero:
-		return 0 # Heroes have no equipped items until the inventory is implemented.
+	if is_hero and equipped_weapon(ranged).is_empty():
+		return 0
 	return skill(str(weapon(ranged).get("skill_id", "")))
 
 
 func weapon_accuracy_bonus(ranged: bool = false) -> int:
-	if is_hero:
+	if is_hero and equipped_weapon(ranged).is_empty():
 		return 0
 	return int(weapon(ranged).get("accuracy_bonus", 0))
 
 
 func armor_skill_bonus() -> int:
 	if is_hero:
-		return 0
+		var seen: Dictionary = {}
+		var bonus := 0
+		for slot in ["body", "head"]:
+			var armor_item: Dictionary = equipped_item(slot)
+			if str(armor_item.get("category", "")) != "armor":
+				continue
+			var armor_data: Dictionary = armor_item.get("armor", {})
+			var armor_type: String = str(armor_data.get("type", ""))
+			if not seen.has(armor_type):
+				bonus += skill(armor_type)
+				seen[armor_type] = true
+		return bonus
 	var armor_value: Variant = profile.get("armor", null)
 	if armor_value is Dictionary:
 		return skill(str(armor_value.get("skill_id", "")))
@@ -129,10 +142,47 @@ func armor_skill_bonus() -> int:
 
 
 func defense() -> int:
-	return 10 + attribute("dexterity") + armor_skill_bonus()
+	return 10 + attribute("dexterity") + armor_skill_bonus() + armor_equipment_bonus()
+
+
+func armor_equipment_bonus() -> int:
+	if not is_hero:
+		return 0
+	var bonus := 0
+	for slot in ["body", "head"]:
+		var item: Dictionary = equipped_item(slot)
+		if str(item.get("category", "")) == "armor":
+			var armor_data: Dictionary = item.get("armor", {})
+			bonus += int(armor_data.get("defense_bonus", 0))
+	return bonus
+
+
+func equipped_item(slot: String) -> Dictionary:
+	if not is_hero:
+		return {}
+	var equipped: Dictionary = profile.get("equipped", {})
+	return equipment_definitions.get(str(equipped.get(slot, "")), {})
+
+
+func equipped_weapon(ranged: bool = false) -> Dictionary:
+	var slots: Array = ["back"] if ranged else ["right_hand", "left_hand"]
+	for slot in slots:
+		var item: Dictionary = equipped_item(slot)
+		if str(item.get("category", "")) == "weapon":
+			return item
+	return {}
 
 
 func weapon(ranged: bool = false) -> Dictionary:
+	var item: Dictionary = equipped_weapon(ranged)
+	if not item.is_empty():
+		var weapon_data: Dictionary = item.get("weapon", {})
+		return {
+			"name": item.get("name", "Оружие"),
+			"skill_id": weapon_data.get("type", ""),
+			"damage_dice": weapon_data.get("damage_dice", "1d4"),
+			"accuracy_bonus": weapon_data.get("accuracy_bonus", 0)
+		}
 	if ranged:
 		return profile.get("ranged_weapon", {})
 	return profile.get("weapon", {})

@@ -6,6 +6,7 @@ const BATTLE = preload("res://scripts/battle_state.gd")
 const BATTLE_AUDIO = preload("res://scripts/battle_audio.gd")
 const COMBATANT = preload("res://scripts/combatant.gd")
 const SKILLS = preload("res://scripts/skill_catalog.gd")
+const INVENTORY_STATE = preload("res://scripts/inventory_state.gd")
 const BACKGROUND: Texture2D = preload("res://assets/battle-ground.png")
 const WORLD_MAP: Texture2D = preload("res://assets/world-map-preview.png")
 const COMBATANTS: Texture2D = preload("res://assets/combatants-atlas.png")
@@ -52,9 +53,9 @@ const HERO_STAT_DESCRIPTIONS := {
 	"Ловкость": "Повышает точность выстрелов и защиту.",
 	"Выносливость": "Определяет максимум здоровья: 5 очков за каждую единицу.",
 	"Интеллект": "Определяет максимум маны: 5 очков за каждую единицу.",
-	"Точность удара": "Сила; бонусы оружия и навыка заработают после появления экипировки. При атаке добавляется 1д20.",
-	"Точность выстрела": "Ловкость; бонусы оружия и навыка пока не действуют. После 5-й клетки штраф 3 за клетку.",
-	"Защита": "10 + ловкость; навык брони начнёт действовать, когда можно будет надеть броню.",
+	"Точность удара": "Сила + бонусы надетого оружия и соответствующего навыка. При атаке добавляется 1д20.",
+	"Точность выстрела": "Ловкость + бонусы надетого оружия и соответствующего навыка. После 5-й клетки штраф 3 за клетку.",
+	"Защита": "10 + ловкость + бонусы надетой брони и соответствующего навыка.",
 	"Текущее здоровье": "Оставшееся здоровье. При 0 герой теряет сознание, при значении ниже −10 погибает.",
 	"Максимум здоровья": "Верхний предел здоровья, равный 5 × Выносливость.",
 	"Текущая мана": "Оставшаяся мана для заклинаний.",
@@ -460,13 +461,8 @@ func _draw_inventory_tab(hero) -> void:
 	_draw_inventory_grid()
 	var inventory: Array = hero.profile.get("inventory", [])
 	_draw_inventory_items(inventory)
-	_draw_equipment_area()
-	if inventory.is_empty():
-		_text("РЮКЗАК ПУСТ", Vector2(435, 755), 17, Color("8f9b91"))
-	else:
-		var first_entry: Dictionary = inventory[0]
-		var first_item: Dictionary = catalog.equipment_profile(str(first_entry.get("item_id", "")))
-		_text(str(first_item.get("name", "Предмет")), Vector2(435, 755), 17, Color("e6cb83"))
+	_draw_equipment_area(hero)
+	_draw_inventory_description(hero, get_local_mouse_position())
 
 
 func _draw_inventory_grid() -> void:
@@ -488,23 +484,64 @@ func _draw_inventory_items(inventory: Array) -> void:
 		var item: Dictionary = catalog.equipment_profile(item_id)
 		if item.is_empty():
 			continue
-		var position_cells: Dictionary = entry.get("position_cells", {})
-		var size_cells: Dictionary = item.get("size_cells", {})
-		var column: int = int(position_cells.get("x", -1))
-		var row: int = int(position_cells.get("y", -1))
-		var width_cells: int = int(size_cells.get("width", 0))
-		var height_cells: int = int(size_cells.get("height", 0))
-		if column < 0 or row < 0 or width_cells < 1 or height_cells < 1 or column + width_cells > 10 or row + height_cells > 10:
+		var item_rect: Rect2 = _inventory_item_rect(entry, item)
+		if item_rect.size == Vector2.ZERO:
 			continue
-		var item_rect := Rect2(Vector2(435 + column * 50, 210 + row * 50), Vector2(width_cells * 50, height_cells * 50))
+		var hovered: bool = item_rect.has_point(get_local_mouse_position())
 		draw_rect(item_rect.grow(-2), Color("34332b"), true)
-		draw_rect(item_rect.grow(-2), Color("d3ad68"), false, 2.0)
+		draw_rect(item_rect.grow(-2), Color("f5d58e") if hovered else Color("d3ad68"), false, 3.0 if hovered else 2.0)
 		var item_texture: Texture2D = equipment_textures.get(item_id, null)
 		if item_texture != null:
 			draw_texture_rect(item_texture, item_rect.grow(-5), false)
 
 
-func _draw_equipment_area() -> void:
+func _inventory_item_rect(entry: Dictionary, item: Dictionary) -> Rect2:
+	var position_cells: Dictionary = entry.get("position_cells", {})
+	var size_cells: Dictionary = item.get("size_cells", {})
+	var column: int = int(position_cells.get("x", -1))
+	var row: int = int(position_cells.get("y", -1))
+	var width_cells: int = int(size_cells.get("width", 0))
+	var height_cells: int = int(size_cells.get("height", 0))
+	if column < 0 or row < 0 or width_cells < 1 or height_cells < 1 or column + width_cells > 10 or row + height_cells > 10:
+		return Rect2()
+	return Rect2(Vector2(435 + column * 50, 210 + row * 50), Vector2(width_cells * 50, height_cells * 50))
+
+
+func _draw_inventory_description(hero, point: Vector2) -> void:
+	var inventory: Array = hero.profile.get("inventory", [])
+	for entry in inventory:
+		if not entry is Dictionary:
+			continue
+		var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
+		if item.is_empty() or not _inventory_item_rect(entry, item).has_point(point):
+			continue
+		_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — надеть."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
+		return
+	for slot in _equipment_slot_specs():
+		var rect: Rect2 = slot["rect"]
+		if rect.has_point(point):
+			var item: Dictionary = hero.equipped_item(str(slot["id"]))
+			if item.is_empty():
+				_draw_hero_sheet_description(str(slot["label"]), str(slot["description"]), "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Здесь появится его описание.")
+			else:
+				_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — снять, если есть место."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
+			return
+	_draw_hero_sheet_description("", "", "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Здесь появится описание предмета или слота снаряжения.")
+
+
+func _inventory_item_description(item: Dictionary, action_hint: String) -> String:
+	var size_cells: Dictionary = item.get("size_cells", {})
+	var description: String = "Размер: %d × %d. %s" % [int(size_cells.get("height", 0)), int(size_cells.get("width", 0)), action_hint]
+	if str(item.get("category", "")) == "weapon":
+		var weapon: Dictionary = item.get("weapon", {})
+		return "Урон %s · точность %+d. %s" % [str(weapon.get("damage_dice", "")), int(weapon.get("accuracy_bonus", 0)), description]
+	if str(item.get("category", "")) == "armor":
+		var armor: Dictionary = item.get("armor", {})
+		return "Защита %+d. %s" % [int(armor.get("defense_bonus", 0)), description]
+	return description
+
+
+func _draw_equipment_area(hero) -> void:
 	var area := Rect2(995, 210, 470, 500)
 	draw_rect(area, Color("1b2425"), true)
 	draw_rect(area, Color("786a4d"), false, 2.0)
@@ -515,17 +552,29 @@ func _draw_equipment_area() -> void:
 	draw_line(Vector2(1258, 368), Vector2(1357, 485), Color("35403f"), 26.0, true)
 	draw_line(Vector2(1208, 500), Vector2(1185, 661), Color("35403f"), 29.0, true)
 	draw_line(Vector2(1252, 500), Vector2(1275, 661), Color("35403f"), 29.0, true)
-	_draw_equipment_slot(Rect2(1181, 228, 98, 82), "ГОЛОВА")
-	_draw_equipment_slot(Rect2(1181, 355, 98, 82), "ТЕЛО")
-	_draw_equipment_slot(Rect2(1015, 392, 98, 82), "ЛЕВАЯ РУКА")
-	_draw_equipment_slot(Rect2(1347, 392, 98, 82), "ПРАВАЯ РУКА")
-	_draw_equipment_slot(Rect2(1347, 570, 98, 82), "ЗА СПИНОЙ")
+	for slot in _equipment_slot_specs():
+		_draw_equipment_slot(slot["rect"], str(slot["label"]), hero.equipped_item(str(slot["id"])))
 
 
-func _draw_equipment_slot(rect: Rect2, label: String) -> void:
+func _equipment_slot_specs() -> Array[Dictionary]:
+	return [
+		{"id": "head", "rect": Rect2(1181, 228, 98, 82), "label": "ГОЛОВА", "description": "Слот для головного убора. Сейчас пуст."},
+		{"id": "body", "rect": Rect2(1181, 355, 98, 82), "label": "ТЕЛО", "description": "Слот для брони на тело. Сейчас пуст."},
+		{"id": "left_hand", "rect": Rect2(1015, 392, 98, 82), "label": "ЛЕВАЯ РУКА", "description": "Слот для предмета в левой руке. Сейчас пуст."},
+		{"id": "right_hand", "rect": Rect2(1347, 392, 98, 82), "label": "ПРАВАЯ РУКА", "description": "Слот для предмета в правой руке. Сейчас пуст."},
+		{"id": "back", "rect": Rect2(1347, 570, 98, 82), "label": "ЗА СПИНОЙ", "description": "Слот для лука за спиной. Сейчас пуст."}
+	]
+
+
+func _draw_equipment_slot(rect: Rect2, label: String, item: Dictionary) -> void:
 	draw_rect(rect, Color("202b2a"), true)
-	draw_rect(rect, Color("a48c5e"), false, 2.0)
+	var hovered: bool = rect.has_point(get_local_mouse_position())
+	draw_rect(rect, Color("f5d58e") if hovered and not item.is_empty() else Color("a48c5e"), false, 3.0 if hovered and not item.is_empty() else 2.0)
 	draw_rect(Rect2(rect.position + Vector2(6, 6), rect.size - Vector2(12, 12)), Color("48544a"), false, 1.0)
+	if not item.is_empty():
+		var texture: Texture2D = equipment_textures.get(str(item.get("id", "")), null)
+		if texture != null:
+			draw_texture_rect(texture, rect.grow(-7), false)
 	var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
 	_text(label, Vector2(rect.position.x + (rect.size.x - label_size.x) * 0.5, rect.end.y + 22), 14, Color("c8c3ae"))
 
@@ -621,12 +670,13 @@ func _draw_hero_stat_description(hero, stat_name: String) -> void:
 		var dexterity: int = hero.attribute("dexterity")
 		if dexterity != 0:
 			defense_parts.append("Ловкость %d" % dexterity)
-		var armor_value: Variant = hero.profile.get("armor", null)
-		if armor_value is Dictionary:
-			var armor_skill: int = hero.armor_skill_bonus()
-			if armor_skill != 0:
-				defense_parts.append("навык %s %d" % [str(armor_value.get("name", "Броня")), armor_skill])
-		description = "%s = %d. Навык брони пока не применяется." % [" + ".join(defense_parts), hero.defense()]
+		var armor_skill: int = hero.armor_skill_bonus()
+		if armor_skill != 0:
+			defense_parts.append("навык брони %d" % armor_skill)
+		var armor_bonus: int = hero.armor_equipment_bonus()
+		if armor_bonus != 0:
+			defense_parts.append("снаряжение %d" % armor_bonus)
+		description = "%s = %d." % [" + ".join(defense_parts), hero.defense()]
 	_draw_hero_sheet_description(stat_name, description, "НАВЕДИТЕ НА ХАРАКТЕРИСТИКУ", "Здесь появится описание её влияния на героя.")
 
 
@@ -705,6 +755,20 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 				if hero.skill(skill_id) > 0 and hero.can_upgrade_skill(skill_id) and _hero_skill_plus_rect(hero, skill_id).has_point(event.position):
 					clickable = true
 					break
+		elif hero_sheet_tab == 2:
+			var hero = map_heroes[hero_sheet_index]
+			var inventory: Array = hero.profile.get("inventory", [])
+			for entry in inventory:
+				var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
+				if not item.is_empty() and _inventory_item_rect(entry, item).has_point(event.position):
+					clickable = true
+					break
+			if not clickable:
+				for slot in _equipment_slot_specs():
+					var slot_rect: Rect2 = slot["rect"]
+					if not hero.equipped_item(str(slot["id"])).is_empty() and slot_rect.has_point(event.position):
+						clickable = true
+						break
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if clickable else Control.CURSOR_ARROW
 		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -740,6 +804,25 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 							party_profiles[hero_sheet_index] = hero.profile.duplicate(true)
 							queue_redraw()
 						break
+			elif hero_sheet_tab == 2:
+				var hero = map_heroes[hero_sheet_index]
+				var inventory: Array = hero.profile.get("inventory", [])
+				var changed := false
+				for item_index in range(inventory.size()):
+					var entry: Dictionary = inventory[item_index]
+					var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
+					if not item.is_empty() and _inventory_item_rect(entry, item).has_point(event.position):
+						changed = INVENTORY_STATE.equip(hero.profile, item_index, catalog.equipment)
+						break
+				if not changed:
+					for slot in _equipment_slot_specs():
+						var slot_rect: Rect2 = slot["rect"]
+						if slot_rect.has_point(event.position):
+							changed = INVENTORY_STATE.unequip(hero.profile, str(slot["id"]), catalog.equipment)
+							break
+				if changed:
+					party_profiles[hero_sheet_index] = hero.profile.duplicate(true)
+					queue_redraw()
 		get_viewport().set_input_as_handled()
 
 
@@ -1667,7 +1750,7 @@ func _confirm_party() -> void:
 	map_heroes.clear()
 	for profile in party_profiles:
 		var hero = COMBATANT.new()
-		hero.initialize(profile, true, Vector2i.ZERO)
+		hero.initialize(profile, true, Vector2i.ZERO, catalog.equipment)
 		map_heroes.append(hero)
 	map_mode = true
 	town_hovered = false
@@ -1714,7 +1797,7 @@ func _begin_battle() -> void:
 	hero_sheet_index = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	battle_audio.start_battle(music_select.get_selected_id())
-	battle.start(party_profiles, chosen_enemies)
+	battle.start(party_profiles, chosen_enemies, catalog.equipment)
 	queue_redraw()
 
 
