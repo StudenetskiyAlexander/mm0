@@ -1489,7 +1489,11 @@ func _draw_action_slot(hero, top: float, slot: int, map_view: bool) -> void:
 	var center: Vector2 = rect.position + Vector2(24, 22)
 	match slot:
 		0: _draw_swords_icon(center, available)
-		1: _draw_bow_icon(center, available)
+		1:
+			if configured:
+				_draw_bow_icon(center, available)
+			else:
+				_draw_empty_icon(center)
 		2:
 			if hero.has_action("fire_arrow"):
 				_draw_fire_icon(center, available)

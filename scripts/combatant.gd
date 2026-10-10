@@ -184,6 +184,8 @@ func weapon(ranged: bool = false) -> Dictionary:
 			"accuracy_bonus": weapon_data.get("accuracy_bonus", 0)
 		}
 	if ranged:
+		if is_hero:
+			return {}
 		return profile.get("ranged_weapon", {})
 	if is_hero:
 		return {"name": "Без оружия", "skill_id": "", "accuracy_bonus": 0, "damage_flat": 1}
@@ -195,6 +197,8 @@ func weapon(ranged: bool = false) -> Dictionary:
 
 func has_action(action_id: String) -> bool:
 	var actions: Array = profile.get("actions", [])
+	if action_id == "shoot" and is_hero and equipped_weapon(true).is_empty():
+		return false
 	return actions.has(action_id)
 
 

@@ -337,6 +337,8 @@ func _nearest_hero(from_cell: Vector2i):
 
 
 func can_shoot(hero) -> bool:
+	if not hero.has_action("shoot"):
+		return false
 	var minimum_range: int = int(hero.weapon(true).get("minimum_attack_range_cells", 2))
 	for enemy in enemies:
 		if enemy.conscious() and BOARD.attack_distance(hero.cell, enemy.cell) < minimum_range:
