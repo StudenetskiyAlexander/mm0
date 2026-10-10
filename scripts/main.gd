@@ -375,6 +375,8 @@ func _draw_hero_sheet() -> void:
 		_draw_characteristics_tab(map_heroes[hero_sheet_index])
 	elif hero_sheet_tab == 1:
 		_draw_skills_tab(map_heroes[hero_sheet_index])
+	elif hero_sheet_tab == 2:
+		_draw_inventory_tab(map_heroes[hero_sheet_index])
 	for index in range(HERO_SHEET_TAB_NAMES.size()):
 		var rect := _hero_sheet_tab_rect(index)
 		var selected: bool = index == hero_sheet_tab
@@ -439,6 +441,54 @@ func _draw_skills_tab(hero) -> void:
 	_draw_skill_group("ДРУГИЕ", SKILLS.OTHER_IDS, Vector2(980, 466), hero, hovered_skill)
 	var description: String = str(SKILLS.DESCRIPTIONS.get(hovered_skill, ""))
 	_draw_hero_sheet_description(hovered_skill, description, "НАВЕДИТЕ НА НАВЫК", "Здесь появится описание навыка и его влияния на героя.")
+
+
+func _draw_inventory_tab(hero) -> void:
+	_draw_hero_sheet_identity(hero)
+	_text("ИНВЕНТАРЬ", Vector2(435, 186), 21, Color("e6cb83"))
+	_text("СНАРЯЖЕНИЕ", Vector2(1000, 186), 21, Color("e6cb83"))
+	draw_line(Vector2(435, 194), Vector2(935, 194), Color("67583d"), 2.0, true)
+	draw_line(Vector2(1000, 194), Vector2(1465, 194), Color("67583d"), 2.0, true)
+	_draw_inventory_grid()
+	_draw_equipment_area()
+	_text("РЮКЗАК ПУСТ", Vector2(435, 755), 17, Color("8f9b91"))
+
+
+func _draw_inventory_grid() -> void:
+	var cell_size := 50.0
+	var grid_origin := Vector2(435, 210)
+	for row in range(10):
+		for column in range(10):
+			var cell := Rect2(grid_origin + Vector2(float(column) * cell_size, float(row) * cell_size), Vector2(cell_size, cell_size))
+			draw_rect(cell, Color("222c2a") if (row + column) % 2 == 0 else Color("1d2726"), true)
+			draw_rect(cell, Color("50594d"), false, 1.0)
+	draw_rect(Rect2(grid_origin, Vector2(500, 500)), Color("ac9362"), false, 2.0)
+
+
+func _draw_equipment_area() -> void:
+	var area := Rect2(995, 210, 470, 500)
+	draw_rect(area, Color("1b2425"), true)
+	draw_rect(area, Color("786a4d"), false, 2.0)
+	# A muted figure shows where the five empty equipment slots belong.
+	draw_circle(Vector2(1230, 290), 35.0, Color("35403f"))
+	draw_rect(Rect2(1188, 345, 84, 171), Color("35403f"), true)
+	draw_line(Vector2(1202, 368), Vector2(1103, 485), Color("35403f"), 26.0, true)
+	draw_line(Vector2(1258, 368), Vector2(1357, 485), Color("35403f"), 26.0, true)
+	draw_line(Vector2(1208, 500), Vector2(1185, 661), Color("35403f"), 29.0, true)
+	draw_line(Vector2(1252, 500), Vector2(1275, 661), Color("35403f"), 29.0, true)
+	_draw_equipment_slot(Rect2(1181, 228, 98, 82), "ГОЛОВА")
+	_draw_equipment_slot(Rect2(1181, 355, 98, 82), "ТЕЛО")
+	_draw_equipment_slot(Rect2(1015, 392, 98, 82), "ЛЕВАЯ РУКА")
+	_draw_equipment_slot(Rect2(1347, 392, 98, 82), "ПРАВАЯ РУКА")
+	_draw_equipment_slot(Rect2(1347, 570, 98, 82), "ЗА СПИНОЙ")
+
+
+func _draw_equipment_slot(rect: Rect2, label: String) -> void:
+	draw_rect(rect, Color("202b2a"), true)
+	draw_rect(rect, Color("a48c5e"), false, 2.0)
+	draw_rect(Rect2(rect.position + Vector2(6, 6), rect.size - Vector2(12, 12)), Color("48544a"), false, 1.0)
+	var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
+	_text(label, Vector2(rect.position.x + (rect.size.x - label_size.x) * 0.5, rect.end.y + 22), 14, Color("c8c3ae"))
 
 
 func _draw_skill_group(title: String, skill_ids: Array, heading: Vector2, hero, hovered_skill: String) -> void:
