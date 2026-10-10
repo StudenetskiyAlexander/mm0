@@ -432,14 +432,11 @@ func _draw_hero_sheet_identity(hero) -> void:
 func _draw_skills_tab(hero) -> void:
 	_draw_hero_sheet_identity(hero)
 	_sheet_value_row("Свободные очки навыков", str(hero.skill_points()), Rect2(435, 170, 1030, 51), true)
-	_text("Следующий ранг навыка стоит столько очков, сколько составляет этот ранг.", Vector2(445, 244), 16, Color("b9b6a9"))
-	var hovered_skill: String = _hovered_hero_skill(get_local_mouse_position())
-	_draw_skill_group("ОРУЖИЕ", SKILLS.WEAPON_IDS, Vector2(435, 261), hero, hovered_skill)
-	_draw_skill_group("БРОНЯ", SKILLS.ARMOR_IDS, Vector2(980, 261), hero, hovered_skill)
-	_draw_skill_group("МАГИЯ", SKILLS.MAGIC_IDS, Vector2(435, 567), hero, hovered_skill)
-	_draw_skill_group("ДРУГИЕ", SKILLS.OTHER_IDS, Vector2(980, 480), hero, hovered_skill)
-	if SKILLS.OTHER_IDS.is_empty():
-		_text("Навыков этой группы пока нет", Vector2(996, 524), 18, Color("838b87"))
+	var hovered_skill: String = _hovered_hero_skill(hero, get_local_mouse_position())
+	_draw_skill_group("ОРУЖИЕ", SKILLS.WEAPON_IDS, Vector2(435, 247), hero, hovered_skill)
+	_draw_skill_group("БРОНЯ", SKILLS.ARMOR_IDS, Vector2(980, 247), hero, hovered_skill)
+	_draw_skill_group("МАГИЯ", SKILLS.MAGIC_IDS, Vector2(435, 552), hero, hovered_skill)
+	_draw_skill_group("ДРУГИЕ", SKILLS.OTHER_IDS, Vector2(980, 466), hero, hovered_skill)
 	var description: String = str(SKILLS.DESCRIPTIONS.get(hovered_skill, ""))
 	_draw_hero_sheet_description(hovered_skill, description, "НАВЕДИТЕ НА НАВЫК", "Здесь появится описание навыка и его влияния на героя.")
 
@@ -447,44 +444,56 @@ func _draw_skills_tab(hero) -> void:
 func _draw_skill_group(title: String, skill_ids: Array, heading: Vector2, hero, hovered_skill: String) -> void:
 	_text(title, heading, 21, Color("e6cb83"))
 	draw_line(heading + Vector2(0, 8), heading + Vector2(480, 8), Color("67583d"), 2.0, true)
+	var has_learned_skill := false
 	for skill_id in skill_ids:
-		var rect: Rect2 = _hero_skill_row_rect(skill_id)
+		if hero.skill(skill_id) <= 0:
+			continue
+		has_learned_skill = true
+		var rect: Rect2 = _hero_skill_row_rect(hero, skill_id)
 		var hovered: bool = hovered_skill == skill_id
 		draw_rect(rect, Color("2c3634") if hovered else Color("202a2b"), true)
 		draw_rect(rect, Color("a58c5b") if hovered else Color("4d5448"), false, 1.0)
 		_text(str(SKILLS.NAMES.get(skill_id, skill_id)), rect.position + Vector2(15, 30), 18, Color("e5e1d2"), 226.0)
-		_text("ранг %d" % hero.skill(skill_id), rect.position + Vector2(245, 30), 17, Color("f5db9b"))
-		var cost: int = hero.skill_upgrade_cost(skill_id)
-		_text("цена %d" % cost, rect.position + Vector2(317, 29), 15, Color("b9b6a9"))
-		var plus_rect: Rect2 = _hero_skill_plus_rect(skill_id)
+		_text("ранг %d" % hero.skill(skill_id), Vector2(rect.end.x - 155, rect.position.y + 30), 17, Color("f5db9b"))
+		var plus_rect: Rect2 = _hero_skill_plus_rect(hero, skill_id)
 		var can_spend: bool = hero.can_upgrade_skill(skill_id)
 		var plus_hovered: bool = can_spend and plus_rect.has_point(get_local_mouse_position())
 		draw_rect(plus_rect, Color("536943") if plus_hovered else (Color("384f3a") if can_spend else Color("303637")), true)
 		draw_rect(plus_rect, Color("f3d98f") if plus_hovered else (Color("b8a36e") if can_spend else Color("64665f")), false, 2.0)
 		_text("+", plus_rect.position + Vector2(13, 28), 23, Color("fff0bc") if can_spend else Color("777c77"))
+	if not has_learned_skill:
+		_text("Нет изученных навыков", heading + Vector2(15, 44), 18, Color("838b87"))
 
 
-func _hero_skill_row_rect(skill_id: String) -> Rect2:
-	var index: int = SKILLS.WEAPON_IDS.find(skill_id)
-	if index >= 0:
-		return Rect2(435, 275 + float(index) * 54.0, 480, 47)
-	index = SKILLS.ARMOR_IDS.find(skill_id)
-	if index >= 0:
-		return Rect2(980, 275 + float(index) * 54.0, 485, 47)
-	index = SKILLS.MAGIC_IDS.find(skill_id)
-	if index >= 0:
-		return Rect2(435, 581 + float(index) * 54.0, 480, 47)
+func _hero_skill_row_rect(hero, skill_id: String) -> Rect2:
+	if SKILLS.WEAPON_IDS.has(skill_id):
+		return _learned_skill_row_rect(hero, skill_id, SKILLS.WEAPON_IDS, Vector2(435, 261), 480)
+	if SKILLS.ARMOR_IDS.has(skill_id):
+		return _learned_skill_row_rect(hero, skill_id, SKILLS.ARMOR_IDS, Vector2(980, 261), 485)
+	if SKILLS.MAGIC_IDS.has(skill_id):
+		return _learned_skill_row_rect(hero, skill_id, SKILLS.MAGIC_IDS, Vector2(435, 566), 480)
 	return Rect2()
 
 
-func _hero_skill_plus_rect(skill_id: String) -> Rect2:
-	var row: Rect2 = _hero_skill_row_rect(skill_id)
+func _learned_skill_row_rect(hero, skill_id: String, group_ids: Array, origin: Vector2, width: float) -> Rect2:
+	var visible_index := 0
+	for group_skill_id in group_ids:
+		if hero.skill(group_skill_id) <= 0:
+			continue
+		if group_skill_id == skill_id:
+			return Rect2(origin + Vector2(0, float(visible_index) * 54.0), Vector2(width, 47))
+		visible_index += 1
+	return Rect2()
+
+
+func _hero_skill_plus_rect(hero, skill_id: String) -> Rect2:
+	var row: Rect2 = _hero_skill_row_rect(hero, skill_id)
 	return Rect2(row.end.x - 58, row.position.y + 4, 42, 39)
 
 
-func _hovered_hero_skill(point: Vector2) -> String:
+func _hovered_hero_skill(hero, point: Vector2) -> String:
 	for skill_id in SKILLS.ALL_IDS:
-		if _hero_skill_row_rect(skill_id).has_point(point):
+		if hero.skill(skill_id) > 0 and _hero_skill_row_rect(hero, skill_id).has_point(point):
 			return skill_id
 	return ""
 
@@ -589,7 +598,7 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 		elif hero_sheet_tab == 1:
 			var hero = map_heroes[hero_sheet_index]
 			for skill_id in SKILLS.ALL_IDS:
-				if hero.can_upgrade_skill(skill_id) and _hero_skill_plus_rect(skill_id).has_point(event.position):
+				if hero.skill(skill_id) > 0 and hero.can_upgrade_skill(skill_id) and _hero_skill_plus_rect(hero, skill_id).has_point(event.position):
 					clickable = true
 					break
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if clickable else Control.CURSOR_ARROW
@@ -613,9 +622,9 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 							queue_redraw()
 						break
 			elif hero_sheet_tab == 1:
+				var hero = map_heroes[hero_sheet_index]
 				for skill_id in SKILLS.ALL_IDS:
-					if _hero_skill_plus_rect(skill_id).has_point(event.position):
-						var hero = map_heroes[hero_sheet_index]
+					if hero.skill(skill_id) > 0 and _hero_skill_plus_rect(hero, skill_id).has_point(event.position):
 						if hero.spend_skill_points(skill_id):
 							party_profiles[hero_sheet_index] = hero.profile.duplicate(true)
 							queue_redraw()
