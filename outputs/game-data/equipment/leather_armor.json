@@ -1,0 +1,12 @@
+{
+  "id": "leather_armor",
+  "name": "Кожаный доспех",
+  "image": "res://assets/equipment/leather-armor.png",
+  "category": "armor",
+  "equip_slots": ["body"],
+  "size_cells": {"height": 2, "width": 2},
+  "armor": {
+    "type": "leather_armor",
+    "defense_bonus": 1
+  }
+}

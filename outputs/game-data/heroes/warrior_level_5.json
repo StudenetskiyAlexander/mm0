@@ -29,6 +29,22 @@
         "x": 0,
         "y": 0
       }
+    },
+    {
+      "item_id": "simple_bow",
+      "position_cells": {"x": 2, "y": 0}
+    },
+    {
+      "item_id": "chainmail",
+      "position_cells": {"x": 4, "y": 0}
+    },
+    {
+      "item_id": "leather_armor",
+      "position_cells": {"x": 6, "y": 0}
+    },
+    {
+      "item_id": "simple_mace",
+      "position_cells": {"x": 8, "y": 0}
     }
   ],
   "armor": {

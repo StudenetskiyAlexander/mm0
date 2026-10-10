@@ -1,0 +1,12 @@
+{
+  "id": "chainmail",
+  "name": "Кольчуга",
+  "image": "res://assets/equipment/chainmail.png",
+  "category": "armor",
+  "equip_slots": ["body"],
+  "size_cells": {"height": 2, "width": 2},
+  "armor": {
+    "type": "chain_armor",
+    "defense_bonus": 2
+  }
+}

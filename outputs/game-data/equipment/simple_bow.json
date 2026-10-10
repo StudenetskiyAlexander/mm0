@@ -1,0 +1,13 @@
+{
+  "id": "simple_bow",
+  "name": "Лук",
+  "image": "res://assets/equipment/simple-bow.png",
+  "category": "weapon",
+  "equip_slots": ["back"],
+  "size_cells": {"height": 3, "width": 2},
+  "weapon": {
+    "type": "bow",
+    "damage_dice": "1d8",
+    "accuracy_bonus": 1
+  }
+}
