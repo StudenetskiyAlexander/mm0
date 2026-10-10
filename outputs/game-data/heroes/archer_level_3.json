@@ -17,11 +17,12 @@
     "intelligence": 3
   },
   "skills": {
+    "dagger": 1,
     "bow": 3,
     "leather_armor": 2
   },
   "unspent_attribute_points": 3,
-  "unspent_skill_points": 1,
+  "unspent_skill_points": 2,
   "armor": {
     "name": "Кожаная броня",
     "skill_id": "leather_armor"
