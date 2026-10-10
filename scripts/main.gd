@@ -366,7 +366,7 @@ func _draw_map_screen() -> void:
 func _draw_hero_sheet() -> void:
 	if hero_sheet_index >= map_heroes.size():
 		return
-	draw_rect(Rect2(Vector2.ZERO, SCREEN_SIZE), Color(0.015, 0.02, 0.025, 0.72), true)
+	draw_rect(Rect2(350, 0, SCREEN_SIZE.x - 350, SCREEN_SIZE.y), Color(0.015, 0.02, 0.025, 0.72), true)
 	draw_rect(HERO_SHEET_RECT, Color("171c1e"), true)
 	draw_rect(HERO_SHEET_RECT, Color("c2a86f"), false, 4.0)
 	draw_rect(Rect2(405, 85, 1090, 740), Color("111719"), true)
@@ -569,6 +569,7 @@ func _open_hero_sheet(index: int) -> void:
 func _close_hero_sheet() -> void:
 	hero_sheet_index = -1
 	hero_sheet_tab = 0
+	hovered_map_hero = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	queue_redraw()
 
@@ -585,7 +586,9 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 			queue_redraw()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
-		var clickable := false
+		var hovering_hero: int = _map_hero_at(event.position)
+		hovered_map_hero = hovering_hero
+		var clickable: bool = hovering_hero >= 0
 		for index in range(HERO_SHEET_TAB_NAMES.size()):
 			if _hero_sheet_tab_rect(index).has_point(event.position):
 				clickable = true
@@ -604,6 +607,13 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if clickable else Control.CURSOR_ARROW
 		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var clicked_hero: int = _map_hero_at(event.position)
+		if clicked_hero >= 0:
+			hero_sheet_index = clicked_hero
+			hovered_map_hero = clicked_hero
+			queue_redraw()
+			get_viewport().set_input_as_handled()
+			return
 		if not HERO_SHEET_RECT.has_point(event.position):
 			_close_hero_sheet()
 		else:
@@ -1123,7 +1133,7 @@ func _draw_hero_panel(party: Array, map_view: bool) -> void:
 			continue
 		var hero = party[index]
 		var selected: bool = not map_view and battle.can_hero_act(index)
-		var edge := Color("f9d985") if map_view and hovered_map_hero == index else (Color("c8ae76") if map_view else (Color("f6cf62") if selected else Color("717b7d")))
+		var edge := Color("f9d985") if map_view and (hovered_map_hero == index or hero_sheet_index == index) else (Color("c8ae76") if map_view else (Color("f6cf62") if selected else Color("717b7d")))
 		var portrait := _hero_portrait_rect(index)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
