@@ -19,7 +19,6 @@
   "unspent_attribute_points": 0,
   "unspent_skill_points": 0,
   "armor": null,
-  "defense_equipment_bonus": 0,
   "movement_speed_cells_per_second": 1.5,
   "weapon": {
     "name": "Клыки",

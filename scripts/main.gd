@@ -54,7 +54,7 @@ const HERO_STAT_DESCRIPTIONS := {
 	"Интеллект": "Определяет максимум маны: 5 очков за каждую единицу.",
 	"Точность удара": "Сила + навык оружия + бонус оружия. При атаке добавляется бросок 1д20.",
 	"Точность выстрела": "Ловкость + навык оружия + бонус оружия. После 5-й клетки штраф 3 за клетку.",
-	"Защита": "10 + ловкость + навык брони + бонус снаряжения. Атака попадает при равенстве или превышении.",
+	"Защита": "10 + ловкость + навык брони. Атака попадает при равенстве или превышении.",
 	"Текущее здоровье": "Оставшееся здоровье. При 0 герой теряет сознание, при значении ниже −10 погибает.",
 	"Максимум здоровья": "Верхний предел здоровья, равный 5 × Выносливость.",
 	"Текущая мана": "Оставшаяся мана для заклинаний.",
@@ -420,7 +420,7 @@ func _draw_characteristics_tab(hero) -> void:
 	_sheet_value_row("Максимум здоровья", str(hero.max_health()), _hero_derived_stat_row_rect(4), false, hovered_stat == "Максимум здоровья")
 	_sheet_value_row("Текущая мана", str(hero.mana), _hero_derived_stat_row_rect(5), false, hovered_stat == "Текущая мана")
 	_sheet_value_row("Максимум маны", str(hero.max_mana()), _hero_derived_stat_row_rect(6), false, hovered_stat == "Максимум маны")
-	_draw_hero_stat_description(hovered_stat)
+	_draw_hero_stat_description(hero, hovered_stat)
 
 
 func _draw_hero_sheet_identity(hero) -> void:
@@ -525,8 +525,20 @@ func _hovered_hero_stat(point: Vector2) -> String:
 	return ""
 
 
-func _draw_hero_stat_description(stat_name: String) -> void:
-	_draw_hero_sheet_description(stat_name, str(HERO_STAT_DESCRIPTIONS.get(stat_name, "")), "НАВЕДИТЕ НА ХАРАКТЕРИСТИКУ", "Здесь появится описание её влияния на героя.")
+func _draw_hero_stat_description(hero, stat_name: String) -> void:
+	var description: String = str(HERO_STAT_DESCRIPTIONS.get(stat_name, ""))
+	if stat_name == "Защита":
+		var defense_parts := PackedStringArray(["10"])
+		var dexterity: int = hero.attribute("dexterity")
+		if dexterity != 0:
+			defense_parts.append("Ловкость %d" % dexterity)
+		var armor_value: Variant = hero.profile.get("armor", null)
+		if armor_value is Dictionary:
+			var armor_skill: int = hero.skill(str(armor_value.get("skill_id", "")))
+			if armor_skill != 0:
+				defense_parts.append("навык %s %d" % [str(armor_value.get("name", "Броня")), armor_skill])
+		description = "%s = %d. Бонус снаряжения пока не применяется." % [" + ".join(defense_parts), hero.defense()]
+	_draw_hero_sheet_description(stat_name, description, "НАВЕДИТЕ НА ХАРАКТЕРИСТИКУ", "Здесь появится описание её влияния на героя.")
 
 
 func _draw_hero_sheet_description(title: String, description: String, placeholder_title: String, placeholder_description: String) -> void:

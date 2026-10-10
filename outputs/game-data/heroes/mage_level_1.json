@@ -25,7 +25,6 @@
     "name": "Тканевая мантия",
     "skill_id": "cloth_armor"
   },
-  "defense_equipment_bonus": 0,
   "weapon": {
     "name": "Посох",
     "attack_type": "melee",

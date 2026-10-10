@@ -19,7 +19,6 @@
   "unspent_attribute_points": 0,
   "unspent_skill_points": 0,
   "armor": null,
-  "defense_equipment_bonus": 0,
   "weapon": {
     "name": "Нож",
     "attack_type": "melee",

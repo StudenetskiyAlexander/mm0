@@ -23,7 +23,6 @@
     "name": "Кольчуга",
     "skill_id": "chain_armor"
   },
-  "defense_equipment_bonus": 2,
   "weapon": {
     "name": "Длинный меч",
     "attack_type": "melee",

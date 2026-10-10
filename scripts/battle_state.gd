@@ -379,7 +379,6 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		armor_name = str(armor_value.get("name", "Броня"))
 		armor_skill = target.skill(str(armor_value.get("skill_id", "")))
 	var target_dexterity: int = target.attribute("dexterity")
-	var equipment_bonus := int(target.profile.get("defense_equipment_bonus", 0))
 	var defense_total: int = target.defense()
 	var action_name := "стреляет в" if ranged else "атакует"
 	var hit: bool = attack_total >= defense_total
@@ -400,8 +399,6 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 		defense_parts.append("Ловкость %d" % target_dexterity)
 	if armor_skill != 0:
 		defense_parts.append("%s %d" % [armor_name, armor_skill])
-	if equipment_bonus != 0:
-		defense_parts.append("снаряжение %d" % equipment_bonus)
 	var details: String = "%s %s %s. Точность: %s = %d. Защита: %s = %d." % [attacker.name(), action_name, target.name(), attack_expression, attack_total, " + ".join(defense_parts), defense_total]
 	if hit:
 		var damage_dice := str(weapon.get("damage_dice", "1d4"))

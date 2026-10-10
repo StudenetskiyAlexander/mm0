@@ -113,7 +113,7 @@ func defense() -> int:
 	var armor_skill := 0
 	if armor_value is Dictionary:
 		armor_skill = skill(str(armor_value.get("skill_id", "")))
-	return 10 + attribute("dexterity") + armor_skill + int(profile.get("defense_equipment_bonus", 0))
+	return 10 + attribute("dexterity") + armor_skill
 
 
 func weapon(ranged: bool = false) -> Dictionary:

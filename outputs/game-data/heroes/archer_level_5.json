@@ -26,7 +26,6 @@
     "name": "Кожаная броня",
     "skill_id": "leather_armor"
   },
-  "defense_equipment_bonus": 1,
   "weapon": {
     "name": "Кинжал",
     "attack_type": "melee",
