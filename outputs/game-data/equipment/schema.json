@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Снаряжение",
+  "description": "Формат отдельного предмета снаряжения для инвентаря героя.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "image",
+    "category",
+    "equip_slots",
+    "size_cells"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^res://assets/equipment/.+\\.png$"
+    },
+    "category": {
+      "enum": [
+        "weapon",
+        "armor"
+      ]
+    },
+    "equip_slots": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "left_hand",
+          "right_hand",
+          "body",
+          "head",
+          "back"
+        ]
+      }
+    },
+    "size_cells": {
+      "type": "object",
+      "required": [
+        "height",
+        "width"
+      ],
+      "properties": {
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "weapon": {
+      "type": "object",
+      "required": [
+        "type",
+        "damage_dice",
+        "accuracy_bonus"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "damage_dice": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*d[1-9][0-9]*$"
+        },
+        "accuracy_bonus": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "armor": {
+      "type": "object",
+      "required": [
+        "type",
+        "defense_bonus"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defense_bonus": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "category": {
+          "const": "weapon"
+        },
+        "equip_slots": {
+          "items": {
+            "enum": [
+              "left_hand",
+              "right_hand",
+              "back"
+            ]
+          }
+        }
+      },
+      "required": [
+        "weapon"
+      ],
+      "not": {
+        "required": [
+          "armor"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "category": {
+          "const": "armor"
+        },
+        "equip_slots": {
+          "items": {
+            "enum": [
+              "body",
+              "head"
+            ]
+          }
+        }
+      },
+      "required": [
+        "armor"
+      ],
+      "not": {
+        "required": [
+          "weapon"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

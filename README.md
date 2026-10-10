@@ -43,6 +43,7 @@
 - `scripts/battle_board.gd` — математическая прямоугольная сетка 4 × 4 клетки.
 - `scripts/battle_state.gd` — бой, движение, атаки, лечение, появление врагов и условия окончания.
 - `scripts/combatant.gd` — состояние отдельного героя или врага.
+- `outputs/game-data/equipment/` — формат и образцы предметов; иллюстрации находятся в `assets/equipment/`.
 - `scripts/data_catalog.gd` — загрузка JSON из `outputs/game-data/heroes` и `outputs/game-data/enemies`.
 - `assets/` — изображения для поля и интерфейса.
 - `assets/audio/` и `scripts/battle_audio.gd` — музыка, эффекты и их воспроизведение.

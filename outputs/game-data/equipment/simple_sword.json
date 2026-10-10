@@ -1,0 +1,19 @@
+{
+  "id": "simple_sword",
+  "name": "Простой меч",
+  "image": "res://assets/equipment/simple-sword.png",
+  "category": "weapon",
+  "equip_slots": [
+    "left_hand",
+    "right_hand"
+  ],
+  "size_cells": {
+    "height": 3,
+    "width": 2
+  },
+  "weapon": {
+    "type": "sword",
+    "damage_dice": "1d6",
+    "accuracy_bonus": 1
+  }
+}
