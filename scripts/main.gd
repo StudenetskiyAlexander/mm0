@@ -914,7 +914,6 @@ func _draw_hero_panel(party: Array, map_view: bool) -> void:
 		if not map_view and targeting_action == "quick_heal" and hero.alive():
 			var hovered: bool = portrait.has_point(get_local_mouse_position())
 			draw_rect(portrait, Color("b9ffd1") if hovered else Color("8ee6b0"), false, 4.0)
-		_text("%d  %s · ур. %d" % [index + 1, hero.name(), int(hero.profile.get("level", 1))], Vector2(21, top + 141), 14, Color.WHITE)
 		_draw_resource_bar(Rect2(14, top + 155, 192, 17), hero.health, hero.max_health(), Color("d83834"))
 		_draw_resource_bar(Rect2(14, top + 178, 192, 17), hero.mana, hero.max_mana(), Color("3187dc"))
 		for slot in range(6):
