@@ -42,7 +42,6 @@ const SCREEN_SIZE := Vector2(1600, 1000)
 const MAP_VIEW_RECT := Rect2(364, 20, 1212, 960)
 const TOWN_SOURCE_POINTS := [Vector2(130, 433), Vector2(161, 407), Vector2(225, 382), Vector2(293, 397), Vector2(341, 433), Vector2(342, 475), Vector2(281, 498), Vector2(211, 494), Vector2(157, 472)]
 const HERO_SHEET_RECT := Rect2(375, 55, 1150, 890)
-const HERO_SHEET_CLOSE_RECT := Rect2(1290, 91, 190, 54)
 const HERO_SHEET_TAB_NAMES := ["ХАРАКТЕРИСТИКИ", "НАВЫКИ", "ИНВЕНТАРЬ", "СПОСОБНОСТИ"]
 const BATTLE_MAP_RECT := Rect2(1112, 12, 151, 69)
 const PREVIEW_GOLD_TEXT := "12 450"
@@ -350,22 +349,11 @@ func _draw_map_screen() -> void:
 func _draw_hero_sheet() -> void:
 	if hero_sheet_index >= map_heroes.size():
 		return
-	var hero = map_heroes[hero_sheet_index]
 	draw_rect(Rect2(Vector2.ZERO, SCREEN_SIZE), Color(0.015, 0.02, 0.025, 0.72), true)
 	draw_rect(HERO_SHEET_RECT, Color("171c1e"), true)
 	draw_rect(HERO_SHEET_RECT, Color("c2a86f"), false, 4.0)
-	draw_rect(Rect2(389, 69, 1122, 238), Color("20282a"), true)
-	draw_line(Vector2(405, 305), Vector2(1495, 305), Color("695a3e"), 2.0, true)
-	_text("СВОЙСТВА ГЕРОЯ", Vector2(411, 112), 29, Color("e7cd89"))
-	draw_rect(Rect2(409, 134, 156, 163), Color("111b22"), true)
-	_draw_portrait(hero, Rect2(412, 137, 150, 157), hero_sheet_index)
-	draw_rect(Rect2(409, 134, 156, 163), Color("d7ba79"), false, 3.0)
-	_text(hero.name(), Vector2(598, 196), 37, Color("f1e9d9"), 650.0)
-	var hero_class_label: String = str(CLASS_NAMES.get(hero.class_id(), "Герой"))
-	_text("%s · %d уровень" % [hero_class_label, int(hero.profile.get("level", 1))], Vector2(600, 243), 22, Color("c9b786"))
-	draw_rect(HERO_SHEET_CLOSE_RECT, Color("303b3a"), true)
-	draw_rect(HERO_SHEET_CLOSE_RECT, Color("bda36b"), false, 2.0)
-	_text("ЗАКРЫТЬ · ESC", Vector2(1307, 126), 18, Color("f0e1bd"))
+	draw_rect(Rect2(405, 85, 1090, 740), Color("111719"), true)
+	draw_rect(Rect2(405, 85, 1090, 740), Color("665b42"), false, 2.0)
 	for index in range(HERO_SHEET_TAB_NAMES.size()):
 		var rect := _hero_sheet_tab_rect(index)
 		var selected: bool = index == hero_sheet_tab
@@ -374,12 +362,10 @@ func _draw_hero_sheet() -> void:
 		if selected:
 			draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 6), Vector2(rect.size.x - 4, 4)), Color("edcf83"), true)
 		_text(HERO_SHEET_TAB_NAMES[index], rect.position + Vector2(13, 40), 19, Color("ffebbc") if selected else Color("b9b6a9"), rect.size.x - 22)
-	draw_rect(Rect2(405, 389, 1090, 514), Color("111719"), true)
-	draw_rect(Rect2(405, 389, 1090, 514), Color("665b42"), false, 2.0)
 
 
 func _hero_sheet_tab_rect(index: int) -> Rect2:
-	return Rect2(405 + float(index) * 272.0, 317, 256, 59)
+	return Rect2(405 + float(index) * 272.0, 854, 256, 64)
 
 
 func _map_hero_at(point: Vector2) -> int:
@@ -418,7 +404,7 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 			queue_redraw()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if HERO_SHEET_CLOSE_RECT.has_point(event.position) or not HERO_SHEET_RECT.has_point(event.position):
+		if not HERO_SHEET_RECT.has_point(event.position):
 			_close_hero_sheet()
 		else:
 			for index in range(HERO_SHEET_TAB_NAMES.size()):
