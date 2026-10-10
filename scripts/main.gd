@@ -41,6 +41,9 @@ const ARCHER_SPRITE: Texture2D = preload("res://assets/human-archer-sprite.png")
 const SCREEN_SIZE := Vector2(1600, 1000)
 const MAP_VIEW_RECT := Rect2(364, 20, 1212, 960)
 const TOWN_SOURCE_POINTS := [Vector2(130, 433), Vector2(161, 407), Vector2(225, 382), Vector2(293, 397), Vector2(341, 433), Vector2(342, 475), Vector2(281, 498), Vector2(211, 494), Vector2(157, 472)]
+const HERO_SHEET_RECT := Rect2(375, 55, 1150, 890)
+const HERO_SHEET_CLOSE_RECT := Rect2(1290, 91, 190, 54)
+const HERO_SHEET_TAB_NAMES := ["ХАРАКТЕРИСТИКИ", "НАВЫКИ", "ИНВЕНТАРЬ", "СПОСОБНОСТИ"]
 const BATTLE_MAP_RECT := Rect2(1112, 12, 151, 69)
 const PREVIEW_GOLD_TEXT := "12 450"
 const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
@@ -83,6 +86,9 @@ var targeting_hero_index := -1
 var battle_audio
 var map_mode := true
 var town_hovered := false
+var hovered_map_hero := -1
+var hero_sheet_index := -1
+var hero_sheet_tab := 0
 var party_profiles: Array[Dictionary] = []
 var map_heroes: Array = []
 
@@ -117,18 +123,27 @@ func _input(event: InputEvent) -> void:
 	if setup_overlay.visible:
 		return
 	if map_mode:
+		if hero_sheet_index >= 0:
+			_handle_hero_sheet_input(event)
+			return
 		if event is InputEventKey and event.pressed and not event.echo:
 			if event.keycode == KEY_ESCAPE:
 				_show_setup()
 				get_viewport().set_input_as_handled()
 		elif event is InputEventMouseMotion:
-			var hovering: bool = _town_at(event.position)
-			if hovering != town_hovered:
-				town_hovered = hovering
-				mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if hovering else Control.CURSOR_ARROW
+			var hovering_town: bool = _town_at(event.position)
+			var hovering_hero: int = _map_hero_at(event.position)
+			if hovering_town != town_hovered or hovering_hero != hovered_map_hero:
+				town_hovered = hovering_town
+				hovered_map_hero = hovering_hero
+				mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if hovering_town or hovering_hero >= 0 else Control.CURSOR_ARROW
 				queue_redraw()
 		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if _town_at(event.position):
+			var clicked_hero: int = _map_hero_at(event.position)
+			if clicked_hero >= 0:
+				_open_hero_sheet(clicked_hero)
+				get_viewport().set_input_as_handled()
+			elif _town_at(event.position):
 				_begin_battle()
 				get_viewport().set_input_as_handled()
 		return
@@ -328,6 +343,90 @@ func _draw_map_screen() -> void:
 		_text("МАЛЫЙ ГОРОД · НАЧАТЬ БОЙ", Vector2(400, 936), 18, Color("ffebba"))
 	_draw_gold_counter()
 	_draw_hero_panel(map_heroes, true)
+	if hero_sheet_index >= 0:
+		_draw_hero_sheet()
+
+
+func _draw_hero_sheet() -> void:
+	if hero_sheet_index >= map_heroes.size():
+		return
+	var hero = map_heroes[hero_sheet_index]
+	draw_rect(Rect2(Vector2.ZERO, SCREEN_SIZE), Color(0.015, 0.02, 0.025, 0.72), true)
+	draw_rect(HERO_SHEET_RECT, Color("171c1e"), true)
+	draw_rect(HERO_SHEET_RECT, Color("c2a86f"), false, 4.0)
+	draw_rect(Rect2(389, 69, 1122, 238), Color("20282a"), true)
+	draw_line(Vector2(405, 305), Vector2(1495, 305), Color("695a3e"), 2.0, true)
+	_text("СВОЙСТВА ГЕРОЯ", Vector2(411, 112), 29, Color("e7cd89"))
+	draw_rect(Rect2(409, 134, 156, 163), Color("111b22"), true)
+	_draw_portrait(hero, Rect2(412, 137, 150, 157), hero_sheet_index)
+	draw_rect(Rect2(409, 134, 156, 163), Color("d7ba79"), false, 3.0)
+	_text(hero.name(), Vector2(598, 196), 37, Color("f1e9d9"), 650.0)
+	var class_name: String = str(CLASS_NAMES.get(hero.class_id(), "Герой"))
+	_text("%s · %d уровень" % [class_name, int(hero.profile.get("level", 1))], Vector2(600, 243), 22, Color("c9b786"))
+	draw_rect(HERO_SHEET_CLOSE_RECT, Color("303b3a"), true)
+	draw_rect(HERO_SHEET_CLOSE_RECT, Color("bda36b"), false, 2.0)
+	_text("ЗАКРЫТЬ · ESC", Vector2(1307, 126), 18, Color("f0e1bd"))
+	for index in range(HERO_SHEET_TAB_NAMES.size()):
+		var rect := _hero_sheet_tab_rect(index)
+		var selected: bool = index == hero_sheet_tab
+		draw_rect(rect, Color("343d3b") if selected else Color("242b2d"), true)
+		draw_rect(rect, Color("edcf83") if selected else Color("806f50"), false, 2.0)
+		if selected:
+			draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 6), Vector2(rect.size.x - 4, 4)), Color("edcf83"), true)
+		_text(HERO_SHEET_TAB_NAMES[index], rect.position + Vector2(13, 40), 19, Color("ffebbc") if selected else Color("b9b6a9"), rect.size.x - 22)
+	draw_rect(Rect2(405, 389, 1090, 514), Color("111719"), true)
+	draw_rect(Rect2(405, 389, 1090, 514), Color("665b42"), false, 2.0)
+
+
+func _hero_sheet_tab_rect(index: int) -> Rect2:
+	return Rect2(405 + float(index) * 272.0, 317, 256, 59)
+
+
+func _map_hero_at(point: Vector2) -> int:
+	for index in range(map_heroes.size()):
+		var top := 109.0 + float(index) * 211.0
+		if Rect2(8, top, 199, 202).has_point(point):
+			return index
+	return -1
+
+
+func _open_hero_sheet(index: int) -> void:
+	hero_sheet_index = index
+	hero_sheet_tab = 0
+	town_hovered = false
+	hovered_map_hero = -1
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
+	queue_redraw()
+
+
+func _close_hero_sheet() -> void:
+	hero_sheet_index = -1
+	hero_sheet_tab = 0
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
+	queue_redraw()
+
+
+func _handle_hero_sheet_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE:
+			_close_hero_sheet()
+		elif event.keycode == KEY_LEFT:
+			hero_sheet_tab = posmod(hero_sheet_tab - 1, HERO_SHEET_TAB_NAMES.size())
+			queue_redraw()
+		elif event.keycode == KEY_RIGHT:
+			hero_sheet_tab = posmod(hero_sheet_tab + 1, HERO_SHEET_TAB_NAMES.size())
+			queue_redraw()
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if HERO_SHEET_CLOSE_RECT.has_point(event.position) or not HERO_SHEET_RECT.has_point(event.position):
+			_close_hero_sheet()
+		else:
+			for index in range(HERO_SHEET_TAB_NAMES.size()):
+				if _hero_sheet_tab_rect(index).has_point(event.position):
+					hero_sheet_tab = index
+					queue_redraw()
+					break
+		get_viewport().set_input_as_handled()
 
 
 func _map_source_rect() -> Rect2:
@@ -821,7 +920,7 @@ func _draw_hero_panel(party: Array, map_view: bool) -> void:
 			continue
 		var hero = party[index]
 		var selected: bool = not map_view and battle.can_hero_act(index)
-		var edge := Color("c8ae76") if map_view else (Color("f6cf62") if selected else Color("717b7d"))
+		var edge := Color("f9d985") if map_view and hovered_map_hero == index else (Color("c8ae76") if map_view else (Color("f6cf62") if selected else Color("717b7d")))
 		var portrait := _hero_portrait_rect(index)
 		draw_rect(portrait, Color("17202a"), true)
 		draw_rect(portrait, edge, false, 4.0)
@@ -1255,6 +1354,8 @@ func _confirm_party() -> void:
 		map_heroes.append(hero)
 	map_mode = true
 	town_hovered = false
+	hovered_map_hero = -1
+	hero_sheet_index = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	battle_audio.stop_preview()
 	music_preview_button.text = "ПРОСЛУШАТЬ"
@@ -1267,6 +1368,8 @@ func _return_to_map() -> void:
 	_cancel_targeting()
 	map_mode = true
 	town_hovered = false
+	hovered_map_hero = -1
+	hero_sheet_index = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	battle_audio.stop_battle()
 	log_panel.hide()
@@ -1290,6 +1393,8 @@ func _begin_battle() -> void:
 	setup_notice.text = ""
 	map_mode = false
 	town_hovered = false
+	hovered_map_hero = -1
+	hero_sheet_index = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	battle_audio.start_battle(music_select.get_selected_id())
 	battle.start(party_profiles, chosen_enemies)
@@ -1302,6 +1407,8 @@ func _show_setup() -> void:
 	music_preview_button.text = "ПРОСЛУШАТЬ"
 	log_panel.hide()
 	town_hovered = false
+	hovered_map_hero = -1
+	hero_sheet_index = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	setup_overlay.show()
 	queue_redraw()
