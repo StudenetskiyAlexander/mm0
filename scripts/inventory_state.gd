@@ -61,6 +61,38 @@ static func unequip(profile: Dictionary, slot: String, definitions: Dictionary) 
 	return true
 
 
+static func transfer(source: Dictionary, recipient: Dictionary, inventory_index: int, equipped_slot: String, definitions: Dictionary) -> bool:
+	var source_inventory: Array = source.get("inventory", []).duplicate(true)
+	var source_equipped: Dictionary = source.get("equipped", {}).duplicate(true)
+	var item_id := ""
+	var preferred := Vector2i(-1, -1)
+	if equipped_slot != "":
+		item_id = str(source_equipped.get(equipped_slot, ""))
+	else:
+		if inventory_index < 0 or inventory_index >= source_inventory.size():
+			return false
+		var entry: Dictionary = source_inventory[inventory_index]
+		item_id = str(entry.get("item_id", ""))
+		var position: Dictionary = entry.get("position_cells", {})
+		preferred = Vector2i(int(position.get("x", -1)), int(position.get("y", -1)))
+	var item: Dictionary = definitions.get(item_id, {})
+	if item.is_empty():
+		return false
+	var recipient_inventory: Array = recipient.get("inventory", []).duplicate(true)
+	var free_cell: Vector2i = _find_free_cell(recipient_inventory, item, definitions, preferred)
+	if free_cell.x < 0:
+		return false
+	if equipped_slot != "":
+		source_equipped.erase(equipped_slot)
+		source["equipped"] = source_equipped
+	else:
+		source_inventory.remove_at(inventory_index)
+		source["inventory"] = source_inventory
+	recipient_inventory.append({"item_id": item_id, "position_cells": {"x": free_cell.x, "y": free_cell.y}})
+	recipient["inventory"] = recipient_inventory
+	return true
+
+
 static func _choose_slot(item: Dictionary, equipped: Dictionary, definitions: Dictionary) -> String:
 	var allowed: Array = item.get("equip_slots", [])
 	# Replacing an item of the same kind takes priority over an empty hand.

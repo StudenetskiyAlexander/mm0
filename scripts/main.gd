@@ -110,6 +110,9 @@ var town_hovered := false
 var hovered_map_hero := -1
 var hero_sheet_index := -1
 var hero_sheet_tab := 0
+var inventory_press: Dictionary = {}
+var inventory_dragging := false
+var inventory_notice := ""
 var party_profiles: Array[Dictionary] = []
 var map_heroes: Array = []
 
@@ -397,6 +400,8 @@ func _draw_hero_sheet() -> void:
 		if selected:
 			draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 6), Vector2(rect.size.x - 4, 4)), Color("edcf83"), true)
 		_text(HERO_SHEET_TAB_NAMES[index], rect.position + Vector2(13, 40), 19, Color("ffebbc") if selected else Color("b9b6a9"), rect.size.x - 22)
+	if inventory_dragging:
+		_draw_inventory_drag_preview()
 
 
 func _draw_characteristics_tab(hero) -> void:
@@ -518,6 +523,12 @@ func _inventory_item_rect(entry: Dictionary, item: Dictionary) -> Rect2:
 
 
 func _draw_inventory_description(hero, point: Vector2) -> void:
+	if inventory_dragging:
+		_draw_hero_sheet_description("ПЕРЕДАЧА ПРЕДМЕТА", "Отпустите предмет на портрете другого героя.", "", "")
+		return
+	if inventory_notice != "":
+		_draw_hero_sheet_description("ПЕРЕДАЧА ПРЕДМЕТА", inventory_notice, "", "")
+		return
 	var inventory: Array = hero.profile.get("inventory", [])
 	for entry in inventory:
 		if not entry is Dictionary:
@@ -525,7 +536,7 @@ func _draw_inventory_description(hero, point: Vector2) -> void:
 		var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
 		if item.is_empty() or not _inventory_item_rect(entry, item).has_point(point):
 			continue
-		_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — надеть."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
+		_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — надеть; 1–4 или перетаскивание — передать."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
 		return
 	for slot in _equipment_slot_specs():
 		var rect: Rect2 = slot["rect"]
@@ -534,9 +545,21 @@ func _draw_inventory_description(hero, point: Vector2) -> void:
 			if item.is_empty():
 				_draw_hero_sheet_description(str(slot["label"]), str(slot["description"]), "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Здесь появится его описание.")
 			else:
-				_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — снять, если есть место."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
+				_draw_hero_sheet_description(str(item.get("name", "Предмет")), _inventory_item_description(item, "Щелчок — снять; 1–4 или перетаскивание — передать."), "НАВЕДИТЕ НА ПРЕДМЕТ", "Здесь появятся его свойства.")
 			return
-	_draw_hero_sheet_description("", "", "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Здесь появится описание предмета или слота снаряжения.")
+	_draw_hero_sheet_description("", "", "НАВЕДИТЕ НА ПРЕДМЕТ ИЛИ СЛОТ", "Наведите на предмет и нажмите 1–4, чтобы передать его герою.")
+
+
+func _draw_inventory_drag_preview() -> void:
+	var item_id: String = str(inventory_press.get("item_id", ""))
+	var item: Dictionary = catalog.equipment_profile(item_id)
+	var texture: Texture2D = equipment_textures.get(item_id, null)
+	if item.is_empty() or texture == null:
+		return
+	var size_cells: Dictionary = item.get("size_cells", {})
+	var item_size := Vector2(int(size_cells.get("width", 0)), int(size_cells.get("height", 0))) * INVENTORY_CELL_SIZE
+	var rect := Rect2(get_local_mouse_position() - item_size * 0.5, item_size)
+	draw_texture_rect(texture, rect.grow(-5), false, Color(1.0, 1.0, 1.0, 0.78))
 
 
 func _inventory_item_description(item: Dictionary, action_hint: String) -> String:
@@ -727,9 +750,88 @@ func _map_hero_at(point: Vector2) -> int:
 	return -1
 
 
+func _portrait_hero_at(point: Vector2) -> int:
+	for index in range(map_heroes.size()):
+		if _hero_portrait_rect(index).has_point(point):
+			return index
+	return -1
+
+
+func _inventory_item_at(point: Vector2) -> Dictionary:
+	if hero_sheet_index < 0 or hero_sheet_tab != 2:
+		return {}
+	var hero = map_heroes[hero_sheet_index]
+	var inventory: Array = hero.profile.get("inventory", [])
+	for item_index in range(inventory.size()):
+		var entry: Dictionary = inventory[item_index]
+		var item_id: String = str(entry.get("item_id", ""))
+		var item: Dictionary = catalog.equipment_profile(item_id)
+		if not item.is_empty() and _inventory_item_rect(entry, item).has_point(point):
+			return {"source_hero": hero_sheet_index, "inventory_index": item_index, "equipped_slot": "", "item_id": item_id}
+	var equipped: Dictionary = hero.profile.get("equipped", {})
+	for slot in _equipment_slot_specs():
+		var slot_rect: Rect2 = slot["rect"]
+		var slot_id: String = str(slot["id"])
+		var equipped_item_id: String = str(equipped.get(slot_id, ""))
+		if equipped_item_id != "" and slot_rect.has_point(point):
+			return {"source_hero": hero_sheet_index, "inventory_index": -1, "equipped_slot": slot_id, "item_id": equipped_item_id}
+	return {}
+
+
+func _activate_inventory_item(location: Dictionary) -> void:
+	var source_index: int = int(location.get("source_hero", -1))
+	if source_index < 0 or source_index >= map_heroes.size():
+		return
+	var hero = map_heroes[source_index]
+	var slot: String = str(location.get("equipped_slot", ""))
+	var changed := false
+	if slot != "":
+		changed = INVENTORY_STATE.unequip(hero.profile, slot, catalog.equipment)
+	else:
+		changed = INVENTORY_STATE.equip(hero.profile, int(location.get("inventory_index", -1)), catalog.equipment)
+	if changed:
+		party_profiles[source_index] = hero.profile.duplicate(true)
+		mouse_default_cursor_shape = Control.CURSOR_ARROW
+		queue_redraw()
+
+
+func _transfer_inventory_item(location: Dictionary, recipient_index: int) -> void:
+	var source_index: int = int(location.get("source_hero", -1))
+	if source_index < 0 or recipient_index < 0 or source_index == recipient_index or recipient_index >= map_heroes.size():
+		return
+	var source = map_heroes[source_index]
+	var recipient = map_heroes[recipient_index]
+	var changed: bool = INVENTORY_STATE.transfer(source.profile, recipient.profile, int(location.get("inventory_index", -1)), str(location.get("equipped_slot", "")), catalog.equipment)
+	if changed:
+		party_profiles[source_index] = source.profile.duplicate(true)
+		party_profiles[recipient_index] = recipient.profile.duplicate(true)
+		var item: Dictionary = catalog.equipment_profile(str(location.get("item_id", "")))
+		inventory_notice = "%s передан герою %s." % [str(item.get("name", "Предмет")), recipient.name()]
+	else:
+		inventory_notice = "У %s нет свободного места для этого предмета." % recipient.name()
+	queue_redraw()
+
+
+func _finish_inventory_press(point: Vector2) -> void:
+	var location: Dictionary = inventory_press.duplicate(true)
+	var was_dragging: bool = inventory_dragging
+	inventory_press.clear()
+	inventory_dragging = false
+	if was_dragging:
+		_transfer_inventory_item(location, _portrait_hero_at(point))
+	else:
+		var released_on: Dictionary = _inventory_item_at(point)
+		if not released_on.is_empty() and int(released_on.get("inventory_index", -2)) == int(location.get("inventory_index", -1)) and str(released_on.get("equipped_slot", "")) == str(location.get("equipped_slot", "")) and str(released_on.get("item_id", "")) == str(location.get("item_id", "")):
+			_activate_inventory_item(location)
+	queue_redraw()
+
+
 func _open_hero_sheet(index: int) -> void:
 	hero_sheet_index = index
 	hero_sheet_tab = 0
+	inventory_press.clear()
+	inventory_dragging = false
+	inventory_notice = ""
 	town_hovered = false
 	hovered_map_hero = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
@@ -739,6 +841,9 @@ func _open_hero_sheet(index: int) -> void:
 func _close_hero_sheet() -> void:
 	hero_sheet_index = -1
 	hero_sheet_tab = 0
+	inventory_press.clear()
+	inventory_dragging = false
+	inventory_notice = ""
 	hovered_map_hero = -1
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	queue_redraw()
@@ -747,15 +852,35 @@ func _close_hero_sheet() -> void:
 func _handle_hero_sheet_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			_close_hero_sheet()
+			if inventory_press.is_empty():
+				_close_hero_sheet()
+			else:
+				inventory_press.clear()
+				inventory_dragging = false
+				queue_redraw()
+		elif hero_sheet_tab == 2 and inventory_press.is_empty() and event.physical_keycode >= KEY_1 and event.physical_keycode <= KEY_4:
+			var location: Dictionary = _inventory_item_at(get_local_mouse_position())
+			if not location.is_empty():
+				_transfer_inventory_item(location, event.physical_keycode - KEY_1)
 		elif event.keycode == KEY_LEFT:
 			hero_sheet_tab = posmod(hero_sheet_tab - 1, HERO_SHEET_TAB_NAMES.size())
+			inventory_notice = ""
 			queue_redraw()
 		elif event.keycode == KEY_RIGHT:
 			hero_sheet_tab = posmod(hero_sheet_tab + 1, HERO_SHEET_TAB_NAMES.size())
+			inventory_notice = ""
 			queue_redraw()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
+		var press_start: Vector2 = inventory_press.get("start", Vector2.ZERO)
+		if not inventory_press.is_empty() and event.position.distance_to(press_start) >= 8.0:
+			inventory_dragging = true
+		if inventory_dragging:
+			hovered_map_hero = _portrait_hero_at(event.position)
+			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if hovered_map_hero >= 0 else Control.CURSOR_ARROW
+			queue_redraw()
+			return
+		inventory_notice = ""
 		var hovering_hero: int = _map_hero_at(event.position)
 		hovered_map_hero = hovering_hero
 		var clickable: bool = hovering_hero >= 0
@@ -775,26 +900,28 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 					clickable = true
 					break
 		elif hero_sheet_tab == 2:
-			var hero = map_heroes[hero_sheet_index]
-			var inventory: Array = hero.profile.get("inventory", [])
-			for entry in inventory:
-				var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
-				if not item.is_empty() and _inventory_item_rect(entry, item).has_point(event.position):
-					clickable = true
-					break
-			if not clickable:
-				for slot in _equipment_slot_specs():
-					var slot_rect: Rect2 = slot["rect"]
-					if not hero.equipped_item(str(slot["id"])).is_empty() and slot_rect.has_point(event.position):
-						clickable = true
-						break
+			clickable = clickable or not _inventory_item_at(event.position).is_empty()
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if clickable else Control.CURSOR_ARROW
 		queue_redraw()
+	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if not inventory_press.is_empty():
+			_finish_inventory_press(event.position)
+			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if hero_sheet_tab == 2:
+			var location: Dictionary = _inventory_item_at(event.position)
+			if not location.is_empty():
+				inventory_press = location
+				inventory_press["start"] = event.position
+				inventory_dragging = false
+				inventory_notice = ""
+				get_viewport().set_input_as_handled()
+				return
 		var clicked_hero: int = _map_hero_at(event.position)
 		if clicked_hero >= 0:
 			hero_sheet_index = clicked_hero
 			hovered_map_hero = clicked_hero
+			inventory_notice = ""
 			queue_redraw()
 			get_viewport().set_input_as_handled()
 			return
@@ -804,6 +931,7 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 			for index in range(HERO_SHEET_TAB_NAMES.size()):
 				if _hero_sheet_tab_rect(index).has_point(event.position):
 					hero_sheet_tab = index
+					inventory_notice = ""
 					queue_redraw()
 					get_viewport().set_input_as_handled()
 					return
@@ -823,25 +951,6 @@ func _handle_hero_sheet_input(event: InputEvent) -> void:
 							party_profiles[hero_sheet_index] = hero.profile.duplicate(true)
 							queue_redraw()
 						break
-			elif hero_sheet_tab == 2:
-				var hero = map_heroes[hero_sheet_index]
-				var inventory: Array = hero.profile.get("inventory", [])
-				var changed := false
-				for item_index in range(inventory.size()):
-					var entry: Dictionary = inventory[item_index]
-					var item: Dictionary = catalog.equipment_profile(str(entry.get("item_id", "")))
-					if not item.is_empty() and _inventory_item_rect(entry, item).has_point(event.position):
-						changed = INVENTORY_STATE.equip(hero.profile, item_index, catalog.equipment)
-						break
-				if not changed:
-					for slot in _equipment_slot_specs():
-						var slot_rect: Rect2 = slot["rect"]
-						if slot_rect.has_point(event.position):
-							changed = INVENTORY_STATE.unequip(hero.profile, str(slot["id"]), catalog.equipment)
-							break
-				if changed:
-					party_profiles[hero_sheet_index] = hero.profile.duplicate(true)
-					queue_redraw()
 		get_viewport().set_input_as_handled()
 
 
