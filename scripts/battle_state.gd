@@ -366,8 +366,8 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var attribute_name := "Ловкость" if ranged else "Сила"
 	var attribute_value: int = attacker.attribute(attribute_key)
 	var skill_name := str(weapon.get("skill_id", ""))
-	var skill_value: int = attacker.skill(skill_name)
-	var weapon_bonus := int(weapon.get("accuracy_bonus", 0))
+	var skill_value: int = attacker.weapon_skill_bonus(ranged)
+	var weapon_bonus: int = attacker.weapon_accuracy_bonus(ranged)
 	var distance: int = BOARD.attack_distance(attacker.cell, target.cell)
 	var range_penalty: int = maxi(0, distance - 5) * 3 if ranged else 0
 	var die := rng.randi_range(1, 20)
@@ -377,7 +377,7 @@ func _physical_attack(attacker, target, ranged: bool) -> void:
 	var armor_skill := 0
 	if armor_value is Dictionary:
 		armor_name = str(armor_value.get("name", "Броня"))
-		armor_skill = target.skill(str(armor_value.get("skill_id", "")))
+		armor_skill = target.armor_skill_bonus()
 	var target_dexterity: int = target.attribute("dexterity")
 	var defense_total: int = target.defense()
 	var action_name := "стреляет в" if ranged else "атакует"

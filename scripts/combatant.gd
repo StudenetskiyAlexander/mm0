@@ -103,17 +103,33 @@ func spend_attribute_point(key: String) -> bool:
 
 
 func accuracy(ranged: bool = false) -> int:
-	var attack_weapon: Dictionary = weapon(ranged)
 	var attribute_key := "dexterity" if ranged else "strength"
-	return attribute(attribute_key) + skill(str(attack_weapon.get("skill_id", ""))) + int(attack_weapon.get("accuracy_bonus", 0))
+	return attribute(attribute_key) + weapon_skill_bonus(ranged) + weapon_accuracy_bonus(ranged)
+
+
+func weapon_skill_bonus(ranged: bool = false) -> int:
+	if is_hero:
+		return 0 # Heroes have no equipped items until the inventory is implemented.
+	return skill(str(weapon(ranged).get("skill_id", "")))
+
+
+func weapon_accuracy_bonus(ranged: bool = false) -> int:
+	if is_hero:
+		return 0
+	return int(weapon(ranged).get("accuracy_bonus", 0))
+
+
+func armor_skill_bonus() -> int:
+	if is_hero:
+		return 0
+	var armor_value: Variant = profile.get("armor", null)
+	if armor_value is Dictionary:
+		return skill(str(armor_value.get("skill_id", "")))
+	return 0
 
 
 func defense() -> int:
-	var armor_value: Variant = profile.get("armor", null)
-	var armor_skill := 0
-	if armor_value is Dictionary:
-		armor_skill = skill(str(armor_value.get("skill_id", "")))
-	return 10 + attribute("dexterity") + armor_skill
+	return 10 + attribute("dexterity") + armor_skill_bonus()
 
 
 func weapon(ranged: bool = false) -> Dictionary:

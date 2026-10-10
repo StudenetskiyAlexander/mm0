@@ -22,7 +22,7 @@
     "body_magic": 1
   },
   "unspent_attribute_points": 0,
-  "unspent_skill_points": 0,
+  "unspent_skill_points": 1,
   "armor": {
     "name": "Кольчуга",
     "skill_id": "chain_armor"

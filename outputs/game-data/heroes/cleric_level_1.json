@@ -17,6 +17,7 @@
     "intelligence": 3
   },
   "skills": {
+    "mace": 1,
     "body_magic": 1
   },
   "unspent_attribute_points": 0,
