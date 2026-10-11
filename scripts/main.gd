@@ -406,8 +406,8 @@ func _draw_hero_sheet() -> void:
 
 func _draw_characteristics_tab(hero) -> void:
 	_draw_hero_sheet_identity(hero)
-	_sheet_value_row("Текущий опыт", "0", Rect2(435, 195, 480, 47))
-	_sheet_value_row("До следующего уровня", "0", Rect2(435, 247, 480, 47))
+	_sheet_value_row("Текущий опыт", str(int(hero.profile.get("experience", 0))), Rect2(435, 195, 480, 47))
+	_sheet_value_row("До следующего уровня", "—", Rect2(435, 247, 480, 47))
 	_sheet_value_row("Свободные очки характеристик", str(hero.attribute_points()), Rect2(435, 299, 480, 47), true)
 	_text("ОСНОВНЫЕ ХАРАКТЕРИСТИКИ", Vector2(437, 394), 21, Color("e6cb83"))
 	draw_line(Vector2(435, 402), Vector2(915, 402), Color("67583d"), 2.0, true)
@@ -2004,8 +2004,15 @@ func _on_battle_event(message: String) -> void:
 	queue_redraw()
 
 
-func _on_battle_end(_victory: bool) -> void:
+func _on_battle_end(victory: bool) -> void:
 	_cancel_targeting()
+	if victory:
+		for index in range(battle.heroes.size()):
+			var total_experience: int = int(battle.heroes[index].profile.get("experience", 0))
+			var party_profile: Dictionary = party_profiles[index]
+			party_profile["experience"] = total_experience
+			party_profiles[index] = party_profile
+			map_heroes[index].profile["experience"] = total_experience
 	battle_audio.finish_battle()
 	queue_redraw()
 

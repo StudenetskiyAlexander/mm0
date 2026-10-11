@@ -568,8 +568,25 @@ func _check_end() -> void:
 			return
 	ended = true
 	won = true
-	_log("Победа: все враги погибли. Опыт в первой версии не начисляется.")
+	_log("Победа: все враги погибли.")
+	_award_victory_experience()
 	battle_ended.emit(true)
+
+
+func _award_victory_experience() -> void:
+	for hero in heroes:
+		if not hero.conscious():
+			continue
+		var hero_level: int = int(hero.profile.get("level", 1))
+		var gained := 0
+		for enemy in enemies:
+			var enemy_level: int = int(enemy.profile.get("level", 1))
+			gained += maxi(0, 100 + 25 * (enemy_level - hero_level))
+		if gained <= 0:
+			continue
+		var total: int = int(hero.profile.get("experience", 0)) + gained
+		hero.profile["experience"] = total
+		_log("%s получает %d опыта за бой (всего %d)." % [hero.name(), gained, total])
 
 
 func _log(message: String) -> void:

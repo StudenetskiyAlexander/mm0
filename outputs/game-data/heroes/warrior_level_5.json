@@ -4,6 +4,7 @@
   "class_id": "warrior",
   "race_id": "human",
   "level": 5,
+  "experience": 0,
   "level_up_attribute_allocations": {
     "strength": 4,
     "dexterity": 2,
