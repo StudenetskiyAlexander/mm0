@@ -9,8 +9,6 @@ var is_hero := false
 var cell := Vector2i.ZERO
 var health := 0
 var mana := 0
-var health_potions := 0
-var mana_potions := 0
 
 
 func initialize(source: Dictionary, hero: bool, starting_cell: Vector2i, definitions: Dictionary = {}) -> void:
@@ -20,10 +18,6 @@ func initialize(source: Dictionary, hero: bool, starting_cell: Vector2i, definit
 	cell = starting_cell
 	health = max_health()
 	mana = max_mana()
-	if hero:
-		var potions: Dictionary = profile.get("potions", {})
-		health_potions = int(potions.get("health", 0))
-		mana_potions = int(potions.get("mana", 0))
 
 
 func name() -> String:
@@ -163,6 +157,37 @@ func equipped_item(slot: String) -> Dictionary:
 		return {}
 	var equipped: Dictionary = profile.get("equipped", {})
 	return equipment_definitions.get(str(equipped.get(slot, "")), {})
+
+
+func potion_count(effect: String) -> int:
+	var count := 0
+	for slot in ["potion_1", "potion_2"]:
+		var item: Dictionary = equipped_item(slot)
+		if str(item.get("category", "")) == "potion":
+			var potion: Dictionary = item.get("potion", {})
+			if str(potion.get("effect", "")) == effect:
+				count += 1
+	return count
+
+
+func consume_potion(effect: String) -> int:
+	if not is_hero:
+		return 0
+	for slot in ["potion_1", "potion_2"]:
+		var item: Dictionary = equipped_item(slot)
+		if str(item.get("category", "")) != "potion":
+			continue
+		var potion: Dictionary = item.get("potion", {})
+		if str(potion.get("effect", "")) != effect:
+			continue
+		var amount: int = int(potion.get("restore_amount", 0))
+		if amount <= 0:
+			continue
+		var equipped: Dictionary = profile.get("equipped", {}).duplicate(true)
+		equipped.erase(slot)
+		profile["equipped"] = equipped
+		return amount
+	return 0
 
 
 func equipped_weapon(ranged: bool = false) -> Dictionary:

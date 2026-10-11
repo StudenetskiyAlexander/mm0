@@ -1,13 +1,15 @@
 extends RefCounted
 
 const GRID_SIZE := 10
-const SLOT_ORDER := ["right_hand", "left_hand", "body", "head", "back"]
+const SLOT_ORDER := ["right_hand", "left_hand", "body", "head", "back", "potion_1", "potion_2"]
 const SLOT_SIZE_CELLS := {
 	"right_hand": Vector2i(2, 3),
 	"left_hand": Vector2i(2, 3),
 	"body": Vector2i(2, 3),
 	"head": Vector2i(2, 2),
-	"back": Vector2i(2, 3)
+	"back": Vector2i(2, 3),
+	"potion_1": Vector2i(1, 1),
+	"potion_2": Vector2i(1, 1)
 }
 
 
@@ -23,6 +25,8 @@ static func required_skill_id(item: Dictionary) -> String:
 
 
 static func can_use(profile: Dictionary, item: Dictionary) -> bool:
+	if str(item.get("category", "")) == "potion":
+		return true
 	var skill_id: String = required_skill_id(item)
 	if skill_id == "":
 		return false
@@ -114,6 +118,10 @@ static func transfer(source: Dictionary, recipient: Dictionary, inventory_index:
 
 static func _choose_slot(item: Dictionary, equipped: Dictionary, definitions: Dictionary) -> String:
 	var allowed: Array = item.get("equip_slots", [])
+	if str(item.get("category", "")) == "potion":
+		for slot in SLOT_ORDER:
+			if allowed.has(slot) and _fits_slot(item, str(slot)) and str(equipped.get(slot, "")) == "":
+				return str(slot)
 	# Replacing an item of the same kind takes priority over an empty hand.
 	for slot in SLOT_ORDER:
 		if not allowed.has(slot) or not _fits_slot(item, str(slot)):
@@ -151,6 +159,10 @@ static func _same_type(first: Dictionary, second: Dictionary) -> bool:
 		var first_armor: Dictionary = first.get("armor", {})
 		var second_armor: Dictionary = second.get("armor", {})
 		return str(first_armor.get("type", "")) == str(second_armor.get("type", ""))
+	if category == "potion":
+		var first_potion: Dictionary = first.get("potion", {})
+		var second_potion: Dictionary = second.get("potion", {})
+		return str(first_potion.get("effect", "")) == str(second_potion.get("effect", ""))
 	return false
 
 

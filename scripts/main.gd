@@ -583,6 +583,10 @@ func _inventory_item_description(item: Dictionary, action_hint: String) -> Strin
 	if str(item.get("category", "")) == "armor":
 		var armor: Dictionary = item.get("armor", {})
 		return "Защита %+d. %s" % [int(armor.get("defense_bonus", 0)), description]
+	if str(item.get("category", "")) == "potion":
+		var potion: Dictionary = item.get("potion", {})
+		var resource := "здоровья" if str(potion.get("effect", "")) == "health" else "маны"
+		return "Восстанавливает %d %s. %s" % [int(potion.get("restore_amount", 0)), resource, description]
 	return description
 
 
@@ -598,7 +602,7 @@ func _draw_equipment_area(hero) -> void:
 	var area := Rect2(995, 210, 470, 520)
 	draw_rect(area, Color("1b2425"), true)
 	draw_rect(area, Color("786a4d"), false, 2.0)
-	# A muted figure shows where the five empty equipment slots belong.
+	# A muted figure shows where the equipment slots belong.
 	draw_circle(Vector2(1230, 290), 35.0, Color("35403f"))
 	draw_rect(Rect2(1188, 345, 84, 171), Color("35403f"), true)
 	draw_line(Vector2(1202, 368), Vector2(1103, 485), Color("35403f"), 26.0, true)
@@ -617,7 +621,9 @@ func _equipment_slot_specs() -> Array[Dictionary]:
 		{"id": "body", "rect": Rect2(Vector2(1180, 355), tall_slot_size), "label": "ТЕЛО", "description": "Слот для брони на тело. Сейчас пуст."},
 		{"id": "left_hand", "rect": Rect2(Vector2(1020, 365), tall_slot_size), "label": "ЛЕВАЯ РУКА", "description": "Слот для предмета в левой руке. Сейчас пуст."},
 		{"id": "right_hand", "rect": Rect2(Vector2(1345, 365), tall_slot_size), "label": "ПРАВАЯ РУКА", "description": "Слот для предмета в правой руке. Сейчас пуст."},
-		{"id": "back", "rect": Rect2(Vector2(1345, 550), tall_slot_size), "label": "ЗА СПИНОЙ", "description": "Слот для лука за спиной. Сейчас пуст."}
+		{"id": "back", "rect": Rect2(Vector2(1345, 550), tall_slot_size), "label": "ЗА СПИНОЙ", "description": "Слот для лука за спиной. Сейчас пуст."},
+		{"id": "potion_1", "rect": Rect2(Vector2(1020, 590), Vector2.ONE * INVENTORY_CELL_SIZE), "label": "ЗЕЛЬЕ I", "description": "Слот для зелья. Выпить его можно во время боя."},
+		{"id": "potion_2", "rect": Rect2(Vector2(1100, 590), Vector2.ONE * INVENTORY_CELL_SIZE), "label": "ЗЕЛЬЕ II", "description": "Слот для зелья. Выпить его можно во время боя."}
 	]
 
 
@@ -1589,9 +1595,9 @@ func _slot_available(hero, slot: int) -> bool:
 	if not battle.can_hero_act(battle.heroes.find(hero)):
 		return false
 	if slot == 4:
-		return hero.health_potions > 0
+		return hero.potion_count("health") > 0
 	if slot == 5:
-		return hero.mana_potions > 0
+		return hero.potion_count("mana") > 0
 	var action_id := _slot_action_id(hero, slot)
 	if action_id == "" or not hero.has_action(action_id):
 		return false
@@ -1607,9 +1613,9 @@ func _draw_action_slot(hero, top: float, slot: int, map_view: bool) -> void:
 	var action_id := _slot_action_id(hero, slot)
 	var configured := false
 	if slot == 4:
-		configured = hero.health_potions > 0
+		configured = hero.potion_count("health") > 0
 	elif slot == 5:
-		configured = hero.mana_potions > 0
+		configured = hero.potion_count("mana") > 0
 	else:
 		configured = action_id != "" and hero.has_action(action_id)
 	var available: bool = configured if map_view else _slot_available(hero, slot)
@@ -1646,7 +1652,7 @@ func _draw_action_slot(hero, top: float, slot: int, map_view: bool) -> void:
 	draw_arc(badge_center, 9.0, 0.0, TAU, 20, Color("e0c681") if available else Color("77736d"), 1.5, true)
 	_text(SLOT_KEYS[slot], badge_center + Vector2(-5, 4), 11, Color.WHITE)
 	if slot == 4 or slot == 5:
-		var count: int = hero.health_potions if slot == 4 else hero.mana_potions
+		var count: int = hero.potion_count("health") if slot == 4 else hero.potion_count("mana")
 		var count_center: Vector2 = rect.position + Vector2(rect.size.x - 9, 36)
 		draw_circle(count_center, 7.0, Color("182025"))
 		_text(str(count), count_center + Vector2(-3, 4), 11, Color.WHITE if available else Color("999999"))
@@ -1922,6 +1928,8 @@ func _confirm_party() -> void:
 
 func _return_to_map() -> void:
 	_cancel_targeting()
+	if not map_mode:
+		_sync_battle_profiles()
 	map_mode = true
 	town_hovered = false
 	hovered_map_hero = -1
@@ -2004,17 +2012,18 @@ func _on_battle_event(message: String) -> void:
 	queue_redraw()
 
 
-func _on_battle_end(victory: bool) -> void:
+func _on_battle_end(_victory: bool) -> void:
 	_cancel_targeting()
-	if victory:
-		for index in range(battle.heroes.size()):
-			var total_experience: int = int(battle.heroes[index].profile.get("experience", 0))
-			var party_profile: Dictionary = party_profiles[index]
-			party_profile["experience"] = total_experience
-			party_profiles[index] = party_profile
-			map_heroes[index].profile["experience"] = total_experience
+	_sync_battle_profiles()
 	battle_audio.finish_battle()
 	queue_redraw()
+
+
+func _sync_battle_profiles() -> void:
+	for index in range(mini(battle.heroes.size(), mini(party_profiles.size(), map_heroes.size()))):
+		var profile: Dictionary = battle.heroes[index].profile.duplicate(true)
+		party_profiles[index] = profile
+		map_heroes[index].profile = profile.duplicate(true)
 
 
 func _clear_animations() -> void:

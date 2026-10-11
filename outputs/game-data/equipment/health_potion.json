@@ -1,0 +1,10 @@
+{
+  "id": "health_potion",
+  "name": "Зелье лечения",
+  "price_gold": 40,
+  "image": "res://assets/equipment/health-potion.svg",
+  "category": "potion",
+  "equip_slots": ["potion_1", "potion_2"],
+  "size_cells": {"height": 1, "width": 1},
+  "potion": {"effect": "health", "restore_amount": 10}
+}

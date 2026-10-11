@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Снаряжение",
-  "description": "Формат отдельного предмета снаряжения для инвентаря героя.",
+  "title": "Предмет инвентаря",
+  "description": "Формат оружия, брони или зелья для инвентаря героя.",
   "type": "object",
   "required": [
     "id",
@@ -27,12 +27,13 @@
     },
     "image": {
       "type": "string",
-      "pattern": "^res://assets/equipment/.+\\.png$"
+      "pattern": "^res://assets/equipment/.+\\.(png|svg)$"
     },
     "category": {
       "enum": [
         "weapon",
-        "armor"
+        "armor",
+        "potion"
       ]
     },
     "equip_slots": {
@@ -45,7 +46,9 @@
           "right_hand",
           "body",
           "head",
-          "back"
+          "back",
+          "potion_1",
+          "potion_2"
         ]
       }
     },
@@ -107,6 +110,15 @@
         }
       },
       "additionalProperties": false
+    },
+    "potion": {
+      "type": "object",
+      "required": ["effect", "restore_amount"],
+      "properties": {
+        "effect": {"enum": ["health", "mana"]},
+        "restore_amount": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
     }
   },
   "oneOf": [
@@ -156,6 +168,22 @@
           "weapon"
         ]
       }
+    },
+    {
+      "properties": {
+        "category": {"const": "potion"},
+        "equip_slots": {
+          "items": {"enum": ["potion_1", "potion_2"]}
+        },
+        "size_cells": {
+          "properties": {
+            "height": {"const": 1},
+            "width": {"const": 1}
+          }
+        }
+      },
+      "required": ["potion"],
+      "not": {"anyOf": [{"required": ["weapon"]}, {"required": ["armor"]}]}
     }
   ],
   "additionalProperties": false

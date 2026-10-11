@@ -192,20 +192,20 @@ func perform_action(index: int, action_id: String, target_override = null) -> bo
 		if not available_heal_targets(index).has(target_override):
 			return false
 	if action_id == "health_potion":
-		if hero.health_potions <= 0:
+		var amount: int = hero.consume_potion("health")
+		if amount <= 0:
 			return false
-		hero.health_potions -= 1
-		var recovered: int = hero.restore_health(10)
+		var recovered: int = hero.restore_health(amount)
 		if recovered > 0:
 			_log("%s выпивает зелье здоровья: +%d здоровья (%d/%d)." % [hero.name(), recovered, hero.health, hero.max_health()])
 		else:
 			_log("%s выпивает зелье здоровья при полном запасе (%d/%d)." % [hero.name(), hero.health, hero.max_health()])
 		visual_event.emit({"kind": "health_potion", "unit": hero, "amount": recovered})
 	elif action_id == "mana_potion":
-		if hero.mana_potions <= 0:
+		var amount: int = hero.consume_potion("mana")
+		if amount <= 0:
 			return false
-		hero.mana_potions -= 1
-		var recovered: int = hero.restore_mana(10)
+		var recovered: int = hero.restore_mana(amount)
 		if recovered > 0:
 			_log("%s выпивает зелье маны: +%d маны (%d/%d)." % [hero.name(), recovered, hero.mana, hero.max_mana()])
 		else:

@@ -46,6 +46,14 @@
     {
       "item_id": "simple_mace",
       "position_cells": {"x": 8, "y": 0}
+    },
+    {
+      "item_id": "health_potion",
+      "position_cells": {"x": 0, "y": 3}
+    },
+    {
+      "item_id": "mana_potion",
+      "position_cells": {"x": 1, "y": 3}
     }
   ],
   "armor": {
@@ -66,10 +74,6 @@
     "fire_arrow",
     "quick_heal"
   ],
-  "potions": {
-    "health": 1,
-    "mana": 1
-  },
   "ranged_weapon": {
     "name": "Короткий лук",
     "attack_type": "ranged",

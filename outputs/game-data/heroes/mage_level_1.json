@@ -38,10 +38,6 @@
     "melee_attack",
     "fire_arrow"
   ],
-  "potions": {
-    "health": 1,
-    "mana": 1
-  },
   "ranged_weapon": {
     "name": "Короткий лук",
     "attack_type": "ranged",
