@@ -6,6 +6,7 @@
   "required": [
     "id",
     "name",
+    "price_gold",
     "image",
     "category",
     "equip_slots",
@@ -19,6 +20,10 @@
     "name": {
       "type": "string",
       "minLength": 1
+    },
+    "price_gold": {
+      "type": "integer",
+      "minimum": 0
     },
     "image": {
       "type": "string",

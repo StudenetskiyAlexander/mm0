@@ -576,7 +576,7 @@ func _draw_inventory_drag_preview() -> void:
 
 func _inventory_item_description(item: Dictionary, action_hint: String) -> String:
 	var size_cells: Dictionary = item.get("size_cells", {})
-	var description: String = "Размер: %d × %d. %s" % [int(size_cells.get("height", 0)), int(size_cells.get("width", 0)), action_hint]
+	var description: String = "Размер %d × %d · стоимость %d зол. %s" % [int(size_cells.get("height", 0)), int(size_cells.get("width", 0)), int(item.get("price_gold", 0)), action_hint]
 	if str(item.get("category", "")) == "weapon":
 		var weapon: Dictionary = item.get("weapon", {})
 		return "Урон %s · точность %+d. %s" % [str(weapon.get("damage_dice", "")), int(weapon.get("accuracy_bonus", 0)), description]

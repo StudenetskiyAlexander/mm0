@@ -1,6 +1,7 @@
 {
   "id": "chainmail",
   "name": "Кольчуга",
+  "price_gold": 100,
   "image": "res://assets/equipment/chainmail.png",
   "category": "armor",
   "equip_slots": ["body"],

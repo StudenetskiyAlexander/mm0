@@ -1,6 +1,7 @@
 {
   "id": "simple_sword",
   "name": "Простой меч",
+  "price_gold": 100,
   "image": "res://assets/equipment/simple-sword.png",
   "category": "weapon",
   "equip_slots": [

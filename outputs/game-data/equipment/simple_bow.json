@@ -1,6 +1,7 @@
 {
   "id": "simple_bow",
   "name": "Лук",
+  "price_gold": 100,
   "image": "res://assets/equipment/simple-bow.png",
   "category": "weapon",
   "equip_slots": ["back"],

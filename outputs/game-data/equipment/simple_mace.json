@@ -1,6 +1,7 @@
 {
   "id": "simple_mace",
   "name": "Булава",
+  "price_gold": 100,
   "image": "res://assets/equipment/simple-mace.png",
   "category": "weapon",
   "equip_slots": ["left_hand", "right_hand"],

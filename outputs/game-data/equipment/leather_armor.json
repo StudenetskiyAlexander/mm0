@@ -1,6 +1,7 @@
 {
   "id": "leather_armor",
   "name": "Кожаный доспех",
+  "price_gold": 100,
   "image": "res://assets/equipment/leather-armor.png",
   "category": "armor",
   "equip_slots": ["body"],
