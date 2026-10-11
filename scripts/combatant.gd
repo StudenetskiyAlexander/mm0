@@ -159,35 +159,28 @@ func equipped_item(slot: String) -> Dictionary:
 	return equipment_definitions.get(str(equipped.get(slot, "")), {})
 
 
-func potion_count(effect: String) -> int:
-	var count := 0
-	for slot in ["potion_1", "potion_2"]:
-		var item: Dictionary = equipped_item(slot)
-		if str(item.get("category", "")) == "potion":
-			var potion: Dictionary = item.get("potion", {})
-			if str(potion.get("effect", "")) == effect:
-				count += 1
-	return count
+func potion_in_slot(slot: String) -> Dictionary:
+	if not ["potion_1", "potion_2"].has(slot):
+		return {}
+	var item: Dictionary = equipped_item(slot)
+	if str(item.get("category", "")) != "potion":
+		return {}
+	var potion: Dictionary = item.get("potion", {})
+	if not ["health", "mana"].has(str(potion.get("effect", ""))) or int(potion.get("restore_amount", 0)) <= 0:
+		return {}
+	return item
 
 
-func consume_potion(effect: String) -> int:
+func consume_potion(slot: String) -> Dictionary:
 	if not is_hero:
-		return 0
-	for slot in ["potion_1", "potion_2"]:
-		var item: Dictionary = equipped_item(slot)
-		if str(item.get("category", "")) != "potion":
-			continue
-		var potion: Dictionary = item.get("potion", {})
-		if str(potion.get("effect", "")) != effect:
-			continue
-		var amount: int = int(potion.get("restore_amount", 0))
-		if amount <= 0:
-			continue
-		var equipped: Dictionary = profile.get("equipped", {}).duplicate(true)
-		equipped.erase(slot)
-		profile["equipped"] = equipped
-		return amount
-	return 0
+		return {}
+	var item: Dictionary = potion_in_slot(slot)
+	if item.is_empty():
+		return {}
+	var equipped: Dictionary = profile.get("equipped", {}).duplicate(true)
+	equipped.erase(slot)
+	profile["equipped"] = equipped
+	return item
 
 
 func equipped_weapon(ranged: bool = false) -> Dictionary:

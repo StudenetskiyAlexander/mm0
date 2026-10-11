@@ -68,7 +68,7 @@ const BATTLE_MAP_RECT := Rect2(1112, 12, 151, 69)
 const PREVIEW_GOLD_TEXT := "12 450"
 const CLASS_ORDER := ["warrior", "mage", "cleric", "archer"]
 const CLASS_NAMES := {"warrior": "Воин", "mage": "Маг", "cleric": "Клирик", "archer": "Лучник"}
-const SLOT_ACTIONS := ["melee_attack", "shoot", "spell", "unused", "health_potion", "mana_potion"]
+const SLOT_ACTIONS := ["melee_attack", "shoot", "spell", "unused", "potion_1", "potion_2"]
 const SLOT_KEYS := ["Q", "W", "E", "R", "A", "S"]
 const ANIMATION_ATLAS_WIDTH_SCALE := 1.25
 const HERO_BATTLE_SPRITE_SCALE := 1.10
@@ -217,9 +217,9 @@ func _handle_key(event: InputEventKey) -> void:
 		if battle.selected_hero >= 0:
 			_activate_action(_support_spell_for(battle.heroes[battle.selected_hero]))
 	elif key == KEY_A:
-		_activate_action("health_potion")
+		_activate_action("potion_1")
 	elif key == KEY_S:
-		_activate_action("mana_potion")
+		_activate_action("potion_2")
 	elif key == KEY_ESCAPE:
 		if targeting_action != "":
 			_cancel_targeting()
@@ -622,8 +622,8 @@ func _equipment_slot_specs() -> Array[Dictionary]:
 		{"id": "left_hand", "rect": Rect2(Vector2(1020, 365), tall_slot_size), "label": "ЛЕВАЯ РУКА", "description": "Слот для предмета в левой руке. Сейчас пуст."},
 		{"id": "right_hand", "rect": Rect2(Vector2(1345, 365), tall_slot_size), "label": "ПРАВАЯ РУКА", "description": "Слот для предмета в правой руке. Сейчас пуст."},
 		{"id": "back", "rect": Rect2(Vector2(1345, 550), tall_slot_size), "label": "ЗА СПИНОЙ", "description": "Слот для лука за спиной. Сейчас пуст."},
-		{"id": "potion_1", "rect": Rect2(Vector2(1020, 590), Vector2.ONE * INVENTORY_CELL_SIZE), "label": "ЗЕЛЬЕ I", "description": "Слот для зелья. Выпить его можно во время боя."},
-		{"id": "potion_2", "rect": Rect2(Vector2(1100, 590), Vector2.ONE * INVENTORY_CELL_SIZE), "label": "ЗЕЛЬЕ II", "description": "Слот для зелья. Выпить его можно во время боя."}
+		{"id": "potion_1", "rect": Rect2(Vector2(1020, 590), Vector2.ONE * INVENTORY_CELL_SIZE), "label": "ЗЕЛЬЕ 1", "description": "Слот для зелья. Выпить его в бою можно клавишей A."},
+		{"id": "potion_2", "rect": Rect2(Vector2(1100, 590), Vector2.ONE * INVENTORY_CELL_SIZE), "label": "ЗЕЛЬЕ 2", "description": "Слот для зелья. Выпить его в бою можно клавишей S."}
 	]
 
 
@@ -1594,10 +1594,8 @@ func _support_spell_for(hero) -> String:
 func _slot_available(hero, slot: int) -> bool:
 	if not battle.can_hero_act(battle.heroes.find(hero)):
 		return false
-	if slot == 4:
-		return hero.potion_count("health") > 0
-	if slot == 5:
-		return hero.potion_count("mana") > 0
+	if slot == 4 or slot == 5:
+		return not hero.potion_in_slot(_slot_action_id(hero, slot)).is_empty()
 	var action_id := _slot_action_id(hero, slot)
 	if action_id == "" or not hero.has_action(action_id):
 		return false
@@ -1612,10 +1610,10 @@ func _draw_action_slot(hero, top: float, slot: int, map_view: bool) -> void:
 	var rect: Rect2 = _slot_rect(top, slot)
 	var action_id := _slot_action_id(hero, slot)
 	var configured := false
-	if slot == 4:
-		configured = hero.potion_count("health") > 0
-	elif slot == 5:
-		configured = hero.potion_count("mana") > 0
+	var potion_item: Dictionary = {}
+	if slot == 4 or slot == 5:
+		potion_item = hero.potion_in_slot(action_id)
+		configured = not potion_item.is_empty()
 	else:
 		configured = action_id != "" and hero.has_action(action_id)
 	var available: bool = configured if map_view else _slot_available(hero, slot)
@@ -1645,17 +1643,21 @@ func _draw_action_slot(hero, top: float, slot: int, map_view: bool) -> void:
 				_draw_heal_icon(center, available)
 			else:
 				_draw_empty_icon(center)
-		4: _draw_potion_icon(center, Color("cc493e"), available)
-		5: _draw_potion_icon(center, Color("338fd0"), available)
+		4, 5:
+			if configured:
+				var potion: Dictionary = potion_item.get("potion", {})
+				var liquid := Color("cc493e") if str(potion.get("effect", "")) == "health" else Color("338fd0")
+				_draw_potion_icon(center, liquid, available)
+			else:
+				_draw_empty_icon(center)
 	var badge_center: Vector2 = rect.position + Vector2(rect.size.x - 9, 8)
 	draw_circle(badge_center, 9.0, Color("2d8dba") if available else Color("585e62"))
 	draw_arc(badge_center, 9.0, 0.0, TAU, 20, Color("e0c681") if available else Color("77736d"), 1.5, true)
 	_text(SLOT_KEYS[slot], badge_center + Vector2(-5, 4), 11, Color.WHITE)
 	if slot == 4 or slot == 5:
-		var count: int = hero.potion_count("health") if slot == 4 else hero.potion_count("mana")
 		var count_center: Vector2 = rect.position + Vector2(rect.size.x - 9, 36)
 		draw_circle(count_center, 7.0, Color("182025"))
-		_text(str(count), count_center + Vector2(-3, 4), 11, Color.WHITE if available else Color("999999"))
+		_text("1" if configured else "0", count_center + Vector2(-3, 4), 11, Color.WHITE if available else Color("999999"))
 
 
 func _draw_swords_icon(center: Vector2, available: bool) -> void:

@@ -191,26 +191,27 @@ func perform_action(index: int, action_id: String, target_override = null) -> bo
 	if action_id == "quick_heal" and target_override != null:
 		if not available_heal_targets(index).has(target_override):
 			return false
-	if action_id == "health_potion":
-		var amount: int = hero.consume_potion("health")
-		if amount <= 0:
+	if action_id == "potion_1" or action_id == "potion_2":
+		var item: Dictionary = hero.consume_potion(action_id)
+		if item.is_empty():
 			return false
-		var recovered: int = hero.restore_health(amount)
-		if recovered > 0:
-			_log("%s выпивает зелье здоровья: +%d здоровья (%d/%d)." % [hero.name(), recovered, hero.health, hero.max_health()])
+		var potion: Dictionary = item.get("potion", {})
+		var amount: int = int(potion.get("restore_amount", 0))
+		var recovered: int = 0
+		if str(potion.get("effect", "")) == "health":
+			recovered = hero.restore_health(amount)
+			if recovered > 0:
+				_log("%s выпивает зелье здоровья: +%d здоровья (%d/%d)." % [hero.name(), recovered, hero.health, hero.max_health()])
+			else:
+				_log("%s выпивает зелье здоровья при полном запасе (%d/%d)." % [hero.name(), hero.health, hero.max_health()])
+			visual_event.emit({"kind": "health_potion", "unit": hero, "amount": recovered})
 		else:
-			_log("%s выпивает зелье здоровья при полном запасе (%d/%d)." % [hero.name(), hero.health, hero.max_health()])
-		visual_event.emit({"kind": "health_potion", "unit": hero, "amount": recovered})
-	elif action_id == "mana_potion":
-		var amount: int = hero.consume_potion("mana")
-		if amount <= 0:
-			return false
-		var recovered: int = hero.restore_mana(amount)
-		if recovered > 0:
-			_log("%s выпивает зелье маны: +%d маны (%d/%d)." % [hero.name(), recovered, hero.mana, hero.max_mana()])
-		else:
-			_log("%s выпивает зелье маны при полном запасе (%d/%d)." % [hero.name(), hero.mana, hero.max_mana()])
-		visual_event.emit({"kind": "mana_potion", "unit": hero, "amount": recovered})
+			recovered = hero.restore_mana(amount)
+			if recovered > 0:
+				_log("%s выпивает зелье маны: +%d маны (%d/%d)." % [hero.name(), recovered, hero.mana, hero.max_mana()])
+			else:
+				_log("%s выпивает зелье маны при полном запасе (%d/%d)." % [hero.name(), hero.mana, hero.max_mana()])
+			visual_event.emit({"kind": "mana_potion", "unit": hero, "amount": recovered})
 	elif not hero.has_action(action_id):
 		return false
 	elif action_id == "melee_attack":
